@@ -225,57 +225,8 @@ export function isNewlyAdded(createdAt?: string): boolean {
   return now - createdTime <= ONE_DAY_MS;
 }
 
-// Verified Catalog: Strictly items scanned/added from user affiliate links
-export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
-  {
-    id: "neutrogena-hydro-boost-water-gel",
-    slug: "neutrogena-hydro-boost-water-gel",
-    name: "Hydro Boost Water Gel with Hyaluronic Acid & Amino Acids (50g)",
-    brand: "Neutrogena",
-    category: "Skincare",
-    type: "affiliate",
-    priceUsd: 5.5,
-    priceInr: 440,
-    storeId: "flipkart",
-    storeName: "Flipkart Health & Beauty",
-    imageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&auto=format&fit=crop&q=80",
-    accent: "from-sky-100 via-blue-50 to-cyan-50",
-    score: 98,
-    keyBenefit: "72-hour continuous hydration boost, oil-free water gel formula with purified hyaluronic acid.",
-    skinType: "Dehydrated skin · Normal to Oily skin",
-    shipsWorldwide: false,
-    shipsIndia: true,
-    shippingNote: "Fast 2-3 Day India Express Delivery (Free over ₹500)",
-    affiliateUrl: "https://fkrt.co/pDEIvN",
-    tag: "Flipkart Verified Link",
-    approvedForPublishing: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "derma-co-salicylic-acid-serum",
-    slug: "derma-co-salicylic-acid-serum",
-    name: "2% Salicylic Acid Face Serum for Active Acne & Blackheads",
-    brand: "The Derma Co",
-    category: "Skincare",
-    type: "affiliate",
-    priceUsd: 6.0,
-    priceInr: 499,
-    storeId: "flipkart",
-    storeName: "Flipkart Health & Beauty",
-    imageUrl: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&auto=format&fit=crop&q=80",
-    accent: "from-teal-100 via-emerald-50 to-cyan-50",
-    score: 94,
-    keyBenefit: "Deeply clears clogged pores, reduces active acne blemishes and controls excess oil.",
-    skinType: "Acne-prone · Oily · Congested skin",
-    shipsWorldwide: false,
-    shipsIndia: true,
-    shippingNote: "Fast 2-3 Day India Delivery via Flipkart (Free over ₹500)",
-    affiliateUrl: "https://fkrt.co/ykrYNt",
-    tag: "Flipkart Verified Link",
-    approvedForPublishing: true,
-    createdAt: new Date().toISOString(),
-  },
-];
+// Initial default catalog: empty until added by user in Control Room
+export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [];
 
 export function calculateShippingCharge(storeId: string, destination: "india" | "worldwide", cartTotalUsd: number) {
   const store = STORE_PARTNERS[storeId] || STORE_PARTNERS.iherb;

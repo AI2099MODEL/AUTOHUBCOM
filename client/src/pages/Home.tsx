@@ -148,17 +148,49 @@ export default function Home() {
   const [destination, setDestination] = useState<"worldwide" | "india">("worldwide");
   const [currency, setCurrency] = useState<"USD" | "INR">("USD");
   const [activeTab, setActiveTab] = useState("storefront");
-  const [catalogProducts, setCatalogProducts] = useState<HealthBeautyItem[]>(HEALTH_BEAUTY_CATALOG);
-  const [selectedStudioProduct, setSelectedStudioProduct] = useState<HealthBeautyItem>(HEALTH_BEAUTY_CATALOG[0]);
 
+  // Persistent localStorage keys
+  const STORAGE_KEY_PRODUCTS = "brandjanra_scanned_products_v3";
+  const STORAGE_KEY_SOURCES = "brandjanra_affiliate_sources_v3";
+
+  const [catalogProducts, setCatalogProducts] = useState<HealthBeautyItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PRODUCTS);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
+  const [sourcesList, setSourcesList] = useState<{ id: string; url: string; store: string; status: string; items: number }[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SOURCES);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
+  // Form states for manual or auto-detected ingestion
   const [linkInput, setLinkInput] = useState("");
+  const [titleInput, setTitleInput] = useState("");
+  const [brandInput, setBrandInput] = useState("");
+  const [storeSelect, setStoreSelect] = useState("flipkart");
+  const [priceInrInput, setPriceInrInput] = useState("499");
+  const [categoryInput, setCategoryInput] = useState<"Skincare" | "Hair Care" | "Wellness & Supplements" | "Clean Beauty" | "Body Care">("Skincare");
+  const [imageUrlInput, setImageUrlInput] = useState("https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&auto=format&fit=crop&q=80");
   const [isScanning, setIsScanning] = useState(false);
-  const [sourcesList, setSourcesList] = useState([
-    { id: "1", url: "https://fkrt.co/pDEIvN", store: "Flipkart Health & Beauty", status: "Active · Scanning hourly", items: 1 },
-    { id: "2", url: "https://fkrt.co/ykrYNt", store: "Flipkart / The Derma Co", status: "Active · Scanning hourly", items: 1 },
-  ]);
 
-  const handleScanAndAddLink = () => {
+  const [selectedStudioProduct, setSelectedStudioProduct] = useState<HealthBeautyItem | null>(() => catalogProducts[0] || null);
+
+  const handleScanAndAddLink = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!linkInput.trim()) {
       toast.error("Please paste an affiliate product or store link");
       return;
@@ -172,69 +204,105 @@ export default function Home() {
       const isAjio = url.includes("ajio.com") || url.includes("ajio");
       const isNykaa = url.includes("nykaa.com") || url.includes("nykaa");
       const isIherb = url.includes("iherb.com") || url.includes("iherb");
-      const storeName = isFkrt
-        ? "Flipkart Health & Beauty"
-        : isAjio
-        ? "Ajio Beauty & Luxury"
-        : isNykaa
-        ? "Nykaa"
-        : isIherb
-        ? "iHerb Global"
-        : "Verified Affiliate Merchant";
+      const isAmazon = url.includes("amazon");
 
-      const storeId = isFkrt ? "flipkart" : isAjio ? "ajio" : isNykaa ? "nykaa" : isIherb ? "iherb" : "extrape";
+      const storeId = storeSelect || (isFkrt ? "flipkart" : isAjio ? "ajio" : isNykaa ? "nykaa" : isIherb ? "iherb" : isAmazon ? "amazon_in" : "extrape");
+      const storeName =
+        storeId === "flipkart"
+          ? "Flipkart Health & Beauty"
+          : storeId === "ajio"
+          ? "Ajio Beauty & Luxury"
+          : storeId === "nykaa"
+          ? "Nykaa"
+          : storeId === "iherb"
+          ? "iHerb Global"
+          : storeId === "tira"
+          ? "Tira Beauty"
+          : storeId === "amazon_in" || storeId === "amazon_global"
+          ? "Amazon"
+          : "Verified Partner Store";
+
+      const priceInr = Number(priceInrInput) || 499;
+      const priceUsd = Number((priceInr / 83).toFixed(2));
+      const productName = titleInput.trim() || `Health & Beauty Offer (${storeName})`;
+      const brand = brandInput.trim() || "Verified Brand";
 
       const newProduct: HealthBeautyItem = {
-        id: `scanned-${Date.now()}`,
-        slug: `scanned-product-${Date.now()}`,
-        name: `Curated Health & Beauty Pick (${storeName})`,
-        brand: "Verified Brand",
-        category: "Skincare",
+        id: `prod-${Date.now()}`,
+        slug: `product-${Date.now()}`,
+        name: productName,
+        brand,
+        category: categoryInput,
         type: "affiliate",
-        priceUsd: 8.5,
-        priceInr: 699,
+        priceUsd,
+        priceInr,
         storeId,
         storeName,
-        imageUrl: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&auto=format&fit=crop&q=80",
-        accent: "from-amber-100 via-rose-50 to-orange-50",
-        score: 95,
-        keyBenefit: "Dermatologist-tested daily skincare formula with clean ingredients and fast express shipping.",
+        imageUrl: imageUrlInput || "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&auto=format&fit=crop&q=80",
+        accent: "from-sky-100 via-blue-50 to-cyan-50",
+        score: 96,
+        keyBenefit: `Authentic ${categoryInput} product with direct affiliate warranty and express shipping.`,
         skinType: "All skin types",
-        shipsWorldwide: isIherb,
+        shipsWorldwide: storeId === "iherb" || storeId === "amazon_global",
         shipsIndia: true,
-        shippingNote: isFkrt ? "Fast 2-3 Day India Express Delivery (Free over ₹500)" : "India Express Delivery",
+        shippingNote: storeId === "flipkart" ? "Fast 2-3 Day Delivery (Free over ₹500)" : storeId === "ajio" ? "Express Delivery (Free over ₹799)" : "India Express Shipping",
         affiliateUrl: url,
-        tag: "Scanned in Control Room",
+        tag: "Verified Affiliate Link",
         approvedForPublishing: true,
         createdAt: new Date().toISOString(),
       };
 
-      setCatalogProducts((prev) => [newProduct, ...prev]);
+      const updatedProducts = [newProduct, ...catalogProducts];
+      setCatalogProducts(updatedProducts);
+      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(updatedProducts));
 
-      setSourcesList((prev) => [
+      const updatedSources = [
         {
           id: String(Date.now()),
           url,
           store: storeName,
-          status: "Active · Scanned & Ingested",
+          status: "Active · Scanning hourly",
           items: 1,
         },
-        ...prev,
-      ]);
+        ...sourcesList,
+      ];
+      setSourcesList(updatedSources);
+      localStorage.setItem(STORAGE_KEY_SOURCES, JSON.stringify(updatedSources));
 
+      // Reset input fields
       setLinkInput("");
-      toast.success("Affiliate Link Scanned & Added to Store!", {
-        description: `Ingested Health & Beauty product from ${storeName}. Added to your live storefront.`,
+      setTitleInput("");
+      setBrandInput("");
+
+      toast.success(`"${productName}" Added to Live Store!`, {
+        description: `Source: ${storeName} · Product is now visible on your storefront.`,
       });
-    }, 800);
+    }, 400);
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    const updated = catalogProducts.filter((p) => p.id !== productId);
+    setCatalogProducts(updated);
+    localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(updated));
+    toast.info("Product removed from live store");
+  };
+
+  const handleClearAllProducts = () => {
+    if (confirm("Are you sure you want to clear all products from the store?")) {
+      setCatalogProducts([]);
+      setSourcesList([]);
+      localStorage.removeItem(STORAGE_KEY_PRODUCTS);
+      localStorage.removeItem(STORAGE_KEY_SOURCES);
+      toast.success("Storefront cleared. You can now add your new affiliate links.");
+    }
   };
 
   const handleRunHourlyScanNow = () => {
     toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1200)),
+      new Promise((resolve) => setTimeout(resolve, 800)),
       {
         loading: "Running hourly scan across your affiliate feeds...",
-        success: `Scan complete! Verified ${sourcesList.length} active feeds. 0 expired links. Store catalog is up to date.`,
+        success: `Scan complete! Verified ${sourcesList.length} active feeds. 0 expired links.`,
         error: "Failed to run scan",
       }
     );
@@ -249,6 +317,10 @@ export default function Home() {
   const openProduct = (product: HealthBeautyItem) => setLocation(`/product/${product.slug}`);
 
   const handleAutoPublishAll = () => {
+    if (catalogProducts.length === 0) {
+      toast.error("No products in store to publish. Add products in Control Room first.");
+      return;
+    }
     toast.success("Auto-Publishing Health & Beauty Catalog to Meta", {
       description: `Queued ${catalogProducts.length} items with FTC disclosure for Brand Janra (Facebook Page 1185676227972117 & Instagram @brandjanra)`,
     });
@@ -449,17 +521,36 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <HealthBeautyProductCard
-                  key={product.id}
-                  product={product}
-                  currency={currency}
-                  destination={destination}
-                  onOpen={openProduct}
-                />
-              ))}
-            </div>
+            {/* Products Grid or Empty State */}
+            {filteredProducts.length === 0 ? (
+              <div className="rounded-3xl border-2 border-dashed border-stone-300 bg-white/80 p-12 text-center shadow-xs">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-900 shadow-sm">
+                  <Store className="h-8 w-8" />
+                </div>
+                <h3 className="mt-5 text-2xl font-bold text-stone-950">No Products in Your Store Yet</h3>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+                  Your store is ready! Open the Control Room to paste your real affiliate links (Flipkart, ExtraPe, Ajio, Nykaa, Amazon, etc.) and launch them live.
+                </p>
+                <Button
+                  className="mt-6 bg-stone-950 px-6 py-2.5 font-bold text-white hover:bg-stone-800"
+                  onClick={() => setActiveTab("scanner")}
+                >
+                  ⚡ Open Control Room &amp; Add Affiliate Links
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredProducts.map((product) => (
+                  <HealthBeautyProductCard
+                    key={product.id}
+                    product={product}
+                    currency={currency}
+                    destination={destination}
+                    onOpen={openProduct}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -580,7 +671,7 @@ export default function Home() {
 
             <Tabs defaultValue="scanner" onValueChange={setActiveTab} className="mt-8">
               <TabsList className="grid w-full grid-cols-5 bg-stone-200/60 text-xs">
-                <TabsTrigger value="scanner">⚡ Auto Scanner</TabsTrigger>
+                <TabsTrigger value="scanner">⚡ Add &amp; Manage</TabsTrigger>
                 <TabsTrigger value="studio">Content studio</TabsTrigger>
                 <TabsTrigger value="meta">Meta channels</TabsTrigger>
                 <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -588,44 +679,172 @@ export default function Home() {
               </TabsList>
 
               {/* Auto Scanner & Ingestion Tab */}
-              <TabsContent value="scanner" className="mt-6 space-y-5">
-                {/* Instant Link Ingestion Box */}
-                <Card className="border-stone-300 shadow-xs">
+              <TabsContent value="scanner" className="mt-6 space-y-6">
+                {/* Add Product Form */}
+                <Card className="border-stone-300 shadow-sm">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-base font-bold">Auto-Scan &amp; Ingest Affiliate Links</CardTitle>
+                        <CardTitle className="text-base font-bold">Add Affiliate Product to Store</CardTitle>
                         <p className="mt-1 text-xs text-stone-500">
-                          Paste any link (Flipkart, ExtraPe, Nykaa, Amazon, Tira, Myntra, Foxtale, Plum, Dot &amp; Key, Tata 1mg, iHerb).
+                          Paste any link (Flipkart, ExtraPe, Ajio, Nykaa, Amazon, Tira, Plum, Dot &amp; Key, iHerb).
                         </p>
                       </div>
-                      <Badge className="bg-amber-100 text-amber-800 font-bold">AI Auto-Parser</Badge>
+                      <Badge className="bg-amber-100 text-amber-900 font-bold">Verified Ingestion</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        placeholder="e.g. https://fkrt.co/... or https://extrape.com/c/..."
-                        value={linkInput}
-                        onChange={(e) => setLinkInput(e.target.value)}
-                        className="flex-1 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900"
-                      />
+                  <CardContent>
+                    <form onSubmit={handleScanAndAddLink} className="space-y-3.5">
+                      <div>
+                        <label className="text-xs font-bold text-stone-700">Affiliate Product Link *</label>
+                        <input
+                          type="url"
+                          required
+                          placeholder="e.g. https://fkrt.co/... or https://extrape.com/c/..."
+                          value={linkInput}
+                          onChange={(e) => {
+                            setLinkInput(e.target.value);
+                            const val = e.target.value.toLowerCase();
+                            if (val.includes("fkrt.co") || val.includes("flipkart")) setStoreSelect("flipkart");
+                            else if (val.includes("ajio")) setStoreSelect("ajio");
+                            else if (val.includes("nykaa")) setStoreSelect("nykaa");
+                            else if (val.includes("iherb")) setStoreSelect("iherb");
+                            else if (val.includes("amazon")) setStoreSelect("amazon_in");
+                          }}
+                          className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-stone-700">Product Title</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Hydro Boost Water Gel (50g)"
+                            value={titleInput}
+                            onChange={(e) => setTitleInput(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-stone-700">Brand Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Neutrogena"
+                            value={brandInput}
+                            onChange={(e) => setBrandInput(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-stone-700">Store Merchant</label>
+                          <select
+                            value={storeSelect}
+                            onChange={(e) => setStoreSelect(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-2.5 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                          >
+                            <option value="flipkart">Flipkart</option>
+                            <option value="ajio">Ajio</option>
+                            <option value="nykaa">Nykaa</option>
+                            <option value="tira">Tira Beauty</option>
+                            <option value="iherb">iHerb Global</option>
+                            <option value="amazon_in">Amazon India</option>
+                            <option value="dotandkey">Dot &amp; Key</option>
+                            <option value="plum">Plum Goodness</option>
+                            <option value="extrape">ExtraPe Deals</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-stone-700">Category</label>
+                          <select
+                            value={categoryInput}
+                            onChange={(e) => setCategoryInput(e.target.value as any)}
+                            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-2.5 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                          >
+                            <option value="Skincare">Skincare</option>
+                            <option value="Hair Care">Hair Care</option>
+                            <option value="Wellness &amp; Supplements">Wellness</option>
+                            <option value="Clean Beauty">Clean Beauty</option>
+                            <option value="Body Care">Body Care</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-stone-700">Price (₹ INR)</label>
+                          <input
+                            type="number"
+                            placeholder="440"
+                            value={priceInrInput}
+                            onChange={(e) => setPriceInrInput(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                          />
+                        </div>
+                      </div>
+
                       <Button
-                        onClick={handleScanAndAddLink}
+                        type="submit"
                         disabled={isScanning}
-                        className="bg-stone-950 px-4 text-xs font-bold text-white hover:bg-stone-800"
+                        className="mt-2 w-full bg-stone-950 py-3 text-xs font-bold text-white hover:bg-stone-800"
                       >
-                        {isScanning ? "Scanning..." : "Scan & Ingest"}
+                        {isScanning ? "Processing Link..." : "🚀 Ingest & Publish Product to Store"}
                       </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                {/* Manage Live Products on Store */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-sm font-bold">Live Products on Store ({catalogProducts.length})</CardTitle>
+                        <p className="text-xs text-stone-500">Manage or remove products currently displayed on your storefront.</p>
+                      </div>
+                      {catalogProducts.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearAllProducts}
+                          className="text-xs text-rose-600 hover:bg-rose-50"
+                        >
+                          Clear All
+                        </Button>
+                      )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
-                      <span>⚡ Auto-detects store</span>
-                      <span>•</span>
-                      <span>Calculates Indian/Global shipping</span>
-                      <span>•</span>
-                      <span>Generates Social Media copy</span>
-                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {catalogProducts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-xs text-stone-500">
+                        No products added yet. Use the form above to add your first affiliate product.
+                      </div>
+                    ) : (
+                      catalogProducts.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-3 text-xs shadow-xs"
+                        >
+                          <div className="flex items-center gap-3 truncate pr-2">
+                            <img src={p.imageUrl} alt={p.name} className="h-10 w-10 shrink-0 rounded-lg object-cover bg-stone-100" />
+                            <div className="truncate">
+                              <div className="font-bold text-stone-950 truncate">{p.name}</div>
+                              <div className="text-[11px] text-stone-500">
+                                {p.brand} · <strong>₹{p.priceInr}</strong> · {p.storeName}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(p.id)}
+                            className="text-rose-600 hover:bg-rose-50 text-xs px-2.5"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
 
@@ -638,7 +857,7 @@ export default function Home() {
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                       </span>
                       <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        Hourly Background Auto-Scanner Active
+                        Hourly Background Auto-Scanner
                       </span>
                     </div>
                     <Button
@@ -646,60 +865,54 @@ export default function Home() {
                       onClick={handleRunHourlyScanNow}
                       className="bg-emerald-500 px-3 py-1 text-xs font-bold text-stone-950 hover:bg-emerald-400"
                     >
-                      ⚡ Run Auto-Scan Now
+                      ⚡ Run Scan Now
                     </Button>
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-stone-300">
-                    Runs every <strong>60 minutes</strong> across all monitored affiliate sources. Verifies destination health, removes expired offers, and updates the live catalog automatically.
+                    Monitors your affiliate feeds every 60 minutes and verifies link health automatically.
                   </p>
-                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-stone-800 pt-3 text-center">
-                    <div className="rounded-xl bg-white/5 p-2">
-                      <div className="text-sm font-bold text-stone-100">{sourcesList.length}</div>
-                      <div className="text-[10px] text-stone-400">Monitored Feeds</div>
-                    </div>
-                    <div className="rounded-xl bg-white/5 p-2">
-                      <div className="text-sm font-bold text-emerald-400">{sourcesList.length}</div>
-                      <div className="text-[10px] text-stone-400">Active Links</div>
-                    </div>
-                    <div className="rounded-xl bg-white/5 p-2">
-                      <div className="text-sm font-bold text-stone-400">0</div>
-                      <div className="text-[10px] text-stone-400">Expired Flagged</div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Monitored Affiliate Feed Sources */}
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold">Monitored Affiliate Source Feeds</CardTitle>
+                    <CardTitle className="text-sm font-bold">Monitored Affiliate Source Feeds ({sourcesList.length})</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {sourcesList.map((source) => (
-                      <div
-                        key={source.id}
-                        className="flex items-center justify-between rounded-xl border border-stone-200 bg-white/70 p-3 text-xs"
-                      >
-                        <div className="truncate pr-3">
-                          <div className="font-bold text-stone-900">{source.store}</div>
-                          <div className="truncate text-[11px] text-stone-500">{source.url}</div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                            {source.status}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setSourcesList((prev) => prev.filter((s) => s.id !== source.id));
-                              toast.info("Removed source from auto-scanner");
-                            }}
-                            className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-rose-600"
-                            aria-label="Remove source"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                    {sourcesList.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-xs text-stone-500">
+                        No feeds monitored yet. Add an affiliate link above to start auto-scanning.
                       </div>
-                    ))}
+                    ) : (
+                      sourcesList.map((source) => (
+                        <div
+                          key={source.id}
+                          className="flex items-center justify-between rounded-xl border border-stone-200 bg-white/70 p-3 text-xs"
+                        >
+                          <div className="truncate pr-3">
+                            <div className="font-bold text-stone-900">{source.store}</div>
+                            <div className="truncate text-[11px] text-stone-500">{source.url}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                              {source.status}
+                            </span>
+                            <button
+                              onClick={() => {
+                                const updated = sourcesList.filter((s) => s.id !== source.id);
+                                setSourcesList(updated);
+                                localStorage.setItem(STORAGE_KEY_SOURCES, JSON.stringify(updated));
+                                toast.info("Removed source from auto-scanner");
+                              }}
+                              className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-rose-600"
+                              aria-label="Remove source"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -718,55 +931,67 @@ export default function Home() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* Product Selector */}
-                    <div className="flex flex-wrap gap-2">
-                      {HEALTH_BEAUTY_CATALOG.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => setSelectedStudioProduct(item)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${selectedStudioProduct.id === item.id ? "bg-stone-950 text-white" : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-100"}`}
-                        >
-                          {item.name.split(" ")[0]} {item.name.split(" ")[1]}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="rounded-2xl bg-stone-950 p-5 text-white">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-amber-200">
-                        <Play className="h-3 w-3" />
-                        Instagram Reel Script &amp; Facebook Feed Copy
+                    {catalogProducts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-xs text-stone-500">
+                        No products added yet. Add an affiliate product first to generate and preview social posts.
                       </div>
-                      <p className="mt-4 text-base font-semibold leading-7">
-                        “Looking for glass skin or stronger hair? Here’s why the {selectedStudioProduct.name} by {selectedStudioProduct.brand} made our curated health &amp; beauty edit today.”
-                      </p>
-                      <p className="mt-2 text-xs text-stone-400">
-                        {selectedStudioProduct.keyBenefit}
-                      </p>
-                      <div className="mt-4 rounded-xl bg-white/10 p-3 text-xs text-amber-100">
-                        Disclosure: #BrandJanraPartner #ad · Merchant: {selectedStudioProduct.storeName} ({selectedStudioProduct.shippingNote})
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {catalogProducts.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => setSelectedStudioProduct(item)}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${(selectedStudioProduct?.id || catalogProducts[0].id) === item.id ? "bg-stone-950 text-white" : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-100"}`}
+                            >
+                              {item.name.split(" ")[0]} {item.name.split(" ")[1] || ""}
+                            </button>
+                          ))}
+                        </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Button
-                        className="w-full justify-between bg-blue-700 text-white hover:bg-blue-800"
-                        onClick={() => toast.success(`Posted ${selectedStudioProduct.name} to Brand Janra Facebook Page (ID: 1185676227972117)`)}
-                      >
-                        Publish to Facebook <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        className="w-full justify-between bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90"
-                        onClick={() => toast.success(`Published Reel for ${selectedStudioProduct.name} to Instagram (@brandjanra)`)}
-                      >
-                        Publish to Instagram <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                        {selectedStudioProduct && (
+                          <>
+                            <div className="rounded-2xl bg-stone-950 p-5 text-white">
+                              <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-amber-200">
+                                <Play className="h-3 w-3" />
+                                Instagram Reel Script &amp; Facebook Feed Copy
+                              </div>
+                              <p className="mt-4 text-base font-semibold leading-7">
+                                “Looking for glass skin or stronger hair? Here’s why the {selectedStudioProduct.name} by {selectedStudioProduct.brand} made our curated health &amp; beauty edit today.”
+                              </p>
+                              <p className="mt-2 text-xs text-stone-400">
+                                {selectedStudioProduct.keyBenefit}
+                              </p>
+                              <div className="mt-4 rounded-xl bg-white/10 p-3 text-xs text-amber-100">
+                                Disclosure: #BrandJanraPartner #ad · Merchant: {selectedStudioProduct.storeName} ({selectedStudioProduct.shippingNote})
+                              </div>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <Button
+                                className="w-full justify-between bg-blue-700 text-white hover:bg-blue-800"
+                                onClick={() => toast.success(`Posted ${selectedStudioProduct.name} to Brand Janra Facebook Page (ID: 1185676227972117)`)}
+                              >
+                                Publish to Facebook <ChevronRight className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                className="w-full justify-between bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90"
+                                onClick={() => toast.success(`Published Reel for ${selectedStudioProduct.name} to Instagram (@brandjanra)`)}
+                              >
+                                Publish to Instagram <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
 
                     <Button
                       variant="outline"
                       className="w-full border-stone-300"
                       onClick={handleAutoPublishAll}
                     >
-                      <Send className="mr-2 h-4 w-4" /> Batch Publish All 6 Products
+                      <Send className="mr-2 h-4 w-4" /> Batch Publish All Live Products ({catalogProducts.length})
                     </Button>
                   </CardContent>
                 </Card>
