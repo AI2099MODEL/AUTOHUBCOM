@@ -20,10 +20,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = `${endpoint}?website-id=${encodeURIComponent(pid)}&keywords=${encodeURIComponent(keyword)}&advertiser-ids=joined&records-per-page=12`;
     const upstream = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/xml" } });
     const raw = await upstream.text();
-    if (!upstream.ok) return res.status(upstream.status === 401 ? 401 : 502).json(error(`CJ REST Link Search returned HTTP ${upstream.status}. ${xmlValue(raw, "error-message") || "Check that the PAT is registered for this PID."}`));
+    if (!upstream.ok) {
+      const cjMessage = xmlValue(raw, "error-message");
+      if (/no joined advertisers/i.test(cjMessage)) return res.status(200).json(error("Your CJ account is active, but it has no joined advertisers. Join at least one advertiser program in CJ, then return here and sync products again."));
+      return res.status(upstream.status === 401 ? 401 : 502).json(error(`CJ REST Link Search returned HTTP ${upstream.status}. ${cjMessage || "Check that the PAT is registered for this PID."}`));
+    }
     if (!raw.trim()) return res.status(502).json(error("CJ REST Link Search returned an empty response."));
     const linkBlocks = allXml(raw, "link");
     const products = linkBlocks.slice(0, 12).map((block, i) => ({ id: xmlValue(block, "link-id") || `cj-link-${i}`, title: xmlValue(block, "link-name") || xmlValue(block, "advertiser-name") || "CJ partner offer", description: xmlValue(block, "description") || "Promotional offer from a CJ advertiser.", price: "View offer", currency: "", advertiserName: xmlValue(block, "advertiser-name") || "CJ advertiser", clickUrl: xmlValue(block, "click-url") || xmlValue(block, "clickUrl"), imageUrl: xmlValue(block, "creative-image-url") || images[i % images.length], syncedAt: new Date().toISOString() }));
+    if (products.length === 0) return res.status(200).json({ ok: false, message: "CJ account is active, but no joined advertisers or eligible links were found. Join at least one advertiser in CJ, then sync again.", products });
     return res.status(200).json({ ok: true, message: `Synced ${products.length} CJ link${products.length === 1 ? "" : "s"} using REST Link Search.`, products });
   } catch (e) { return res.status(502).json(error(e instanceof Error ? e.message : "CJ REST Link Search request failed.")); }
 }
