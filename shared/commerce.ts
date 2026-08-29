@@ -107,6 +107,15 @@ export type HealthBeautyItem = {
   shippingNote: string;
   affiliateUrl: string;
   tag: string;
+  approvedForPublishing: boolean;
+};
+
+// Configurable Affiliate IDs (defaults to Brand Janra tracking codes)
+export const AFFILIATE_CONFIG = {
+  iherbCode: process.env.AFFILIATE_IHERB_CODE || "JANRAAFF",
+  amazonUsTag: process.env.AFFILIATE_AMAZON_US_TAG || "janra-20",
+  amazonInTag: process.env.AFFILIATE_AMAZON_IN_TAG || "janra-21",
+  nykaaId: process.env.AFFILIATE_NYKAA_ID || "janra",
 };
 
 export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
@@ -128,8 +137,9 @@ export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
     shipsWorldwide: true,
     shipsIndia: true,
     shippingNote: "Worldwide shipping · Free over $40 (₹3,300) on iHerb",
-    affiliateUrl: "https://www.iherb.com/pr/cosrx-advanced-snail-96-mucin-power-essence-3-38-fl-oz-100-ml/64016?rcode=JANRAAFF",
+    affiliateUrl: `https://www.iherb.com/pr/cosrx-advanced-snail-96-mucin-power-essence-3-38-fl-oz-100-ml/64016?rcode=${AFFILIATE_CONFIG.iherbCode}`,
     tag: "Global Bestseller",
+    approvedForPublishing: true,
   },
   {
     id: "the-ordinary-niacinamide-zinc",
@@ -149,8 +159,9 @@ export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
     shipsWorldwide: true,
     shipsIndia: true,
     shippingNote: "India express delivery · Free over ₹499",
-    affiliateUrl: "https://www.nykaa.com/the-ordinary-niacinamide-10-zinc-1/p/5003153?aff=janra",
+    affiliateUrl: `https://www.nykaa.com/the-ordinary-niacinamide-10-zinc-1/p/5003153?aff=${AFFILIATE_CONFIG.nykaaId}`,
     tag: "High Repeat Pick",
+    approvedForPublishing: true,
   },
   {
     id: "mielle-rosemary-mint-oil",
@@ -170,8 +181,9 @@ export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
     shipsWorldwide: true,
     shipsIndia: true,
     shippingNote: "Worldwide shipping via Amazon Global & Amazon India",
-    affiliateUrl: "https://www.amazon.com/dp/B07N7PK9QK?tag=janra-20",
+    affiliateUrl: `https://www.amazon.com/dp/B07N7PK9QK?tag=${AFFILIATE_CONFIG.amazonUsTag}`,
     tag: "Viral Haircare",
+    approvedForPublishing: true,
   },
   {
     id: "cerave-hydrating-facial-cleanser",
@@ -191,8 +203,9 @@ export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
     shipsWorldwide: true,
     shipsIndia: true,
     shippingNote: "Worldwide shipping · Free over $40 (₹3,300)",
-    affiliateUrl: "https://www.iherb.com/pr/cerave-hydrating-facial-cleanser-16-fl-oz-473-ml/83025?rcode=JANRAAFF",
+    affiliateUrl: `https://www.iherb.com/pr/cerave-hydrating-facial-cleanser-16-fl-oz-473-ml/83025?rcode=${AFFILIATE_CONFIG.iherbCode}`,
     tag: "Dermatologist Approved",
+    approvedForPublishing: true,
   },
   {
     id: "minimalist-10-vitamin-c",
@@ -212,29 +225,9 @@ export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
     shipsWorldwide: true,
     shipsIndia: true,
     shippingNote: "Ships India (Free > ₹499) & Global via Amazon/iHerb",
-    affiliateUrl: "https://www.nykaa.com/minimalist-10-vitamin-c-face-serum/p/1067982?aff=janra",
+    affiliateUrl: `https://www.nykaa.com/minimalist-10-vitamin-c-face-serum/p/1067982?aff=${AFFILIATE_CONFIG.nykaaId}`,
     tag: "Clean Formulation",
-  },
-  {
-    id: "organic-india-ashwagandha",
-    slug: "organic-india-ashwagandha",
-    name: "Organic KSM-66 Ashwagandha Stress Relief & Energy",
-    brand: "Organic India",
-    category: "Wellness & Supplements",
-    type: "affiliate",
-    priceUsd: 17.5,
-    priceInr: 450,
-    storeId: "amazon_in",
-    storeName: "Amazon India / iHerb Global",
-    accent: "from-stone-200 via-amber-50 to-orange-50",
-    score: 91,
-    keyBenefit: "Ayurvedic adaptogen that lowers cortisol, boosts sleep quality and stamina.",
-    skinType: "Stress relief · Daily vitality",
-    shipsWorldwide: true,
-    shipsIndia: true,
-    shippingNote: "India & Worldwide shipping available",
-    affiliateUrl: "https://www.amazon.in/dp/B003PLNA6A?tag=janra-21",
-    tag: "Herbal Wellness",
+    approvedForPublishing: true,
   },
 ];
 
