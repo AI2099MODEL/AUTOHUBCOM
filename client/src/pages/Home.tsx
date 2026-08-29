@@ -152,8 +152,8 @@ export default function Home() {
 
       <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#f8f6f1]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-          <a href="#top" className="flex items-center gap-3" aria-label="Brand Janra Curated Health and Beauty">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-stone-950 text-sm font-bold text-amber-200">BJ</span>
+          <a href="#top" className="flex items-center gap-3.5" aria-label="Brand Janra Curated Health and Beauty">
+            <img src="/logo-icon.png" alt="Brand Janra" className="h-11 w-11 object-contain rounded-2xl bg-stone-900 p-1 shadow-sm border border-stone-800" />
             <span>
               <span className="block text-sm font-bold tracking-[0.18em]">BRAND JANRA</span>
               <span className="block text-[10px] uppercase tracking-[0.2em] text-stone-500">Global Health &amp; Beauty Edit</span>
