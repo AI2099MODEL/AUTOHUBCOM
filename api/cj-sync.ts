@@ -15,9 +15,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (token.length < 8) return res.status(400).json(error("A CJ Personal Access Token is required."));
   const pid = String(body.pid || "").replace(/[^0-9]/g, "");
   if (!pid) return res.status(400).json(error("Brand Janra Promotional Property ID (PID) is required."));
-  const keyword = String(body.keyword || "beauty").replace(/[^a-zA-Z0-9 +\-]/g, "") || "beauty";
+  const keyword = String(body.keyword || "").replace(/[^a-zA-Z0-9 +\-]/g, "");
   try {
-    const url = `${endpoint}?website-id=${encodeURIComponent(pid)}&keywords=${encodeURIComponent(keyword)}&advertiser-ids=joined&records-per-page=12`;
+    const params = new URLSearchParams({ "website-id": pid, "advertiser-ids": "joined", "records-per-page": "12" });
+    if (keyword) params.set("keywords", keyword);
+    const url = `${endpoint}?${params.toString()}`;
     const upstream = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/xml" } });
     const raw = await upstream.text();
     if (!upstream.ok) {
