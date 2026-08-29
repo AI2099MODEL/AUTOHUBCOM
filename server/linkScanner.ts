@@ -93,6 +93,7 @@ export function autoScanAndParseLink(url: string, manualOverrides?: Partial<Heal
       priceInr,
       storeId,
       storeName,
+      imageUrl: manualOverrides?.imageUrl || "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&auto=format&fit=crop&q=80",
       accent: "from-rose-100 via-amber-50 to-pink-50",
       score: 95,
       keyBenefit,
