@@ -19,8 +19,13 @@ export async function syncCjProducts(input: CjSyncInput) {
   const query = `{ products(companyId: "${input.companyId.replace(/[^0-9]/g, "")}", keywords: "${(input.keyword || "beauty").replace(/[^a-zA-Z0-9 -]/g, "")}") { resultList { advertiserName id title description price { amount currency } linkCode(pid: "${input.pid.replace(/[^0-9]/g, "")}") { clickUrl } } } }`;
   try {
     const response = await fetch("https://ads.api.cj.com/query", { method: "POST", headers: { Authorization: `Bearer ${input.apiToken.trim()}`, "Content-Type": "application/json" }, body: JSON.stringify({ query }) });
-    if (!response.ok) return { ok: false, message: `CJ Product Feed API returned HTTP ${response.status}. Check the token, company ID, and advertiser relationships.`, products: [] as CjProduct[] } as const;
-    const payload = await response.json() as { data?: { products?: { resultList?: Array<any> } }; errors?: Array<{ message?: string }> };
+    const rawBody = await response.text();
+    let payload: { data?: { products?: { resultList?: Array<any> } }; errors?: Array<{ message?: string }> } = {};
+    if (rawBody.trim()) {
+      try { payload = JSON.parse(rawBody); }
+      catch { return { ok: false, message: `CJ Product Feed API returned HTTP ${response.status} with a non-JSON response. Check the endpoint, token, and CJ API access.`, products: [] as CjProduct[] } as const; }
+    }
+    if (!response.ok) return { ok: false, message: payload.errors?.map((error) => error.message).filter(Boolean).join("; ") || `CJ Product Feed API returned HTTP ${response.status}. Check the token, company ID, and advertiser relationships.`, products: [] as CjProduct[] } as const;
     if (payload.errors?.length) return { ok: false, message: payload.errors.map((error) => error.message).filter(Boolean).join("; ") || "CJ rejected the Product Feed request.", products: [] as CjProduct[] } as const;
     const rows = payload.data?.products?.resultList || [];
     syncedProducts = rows.slice(0, Math.min(input.limit || 12, 50)).map((product, index) => ({ id: String(product.id || `cj-${index}`), title: String(product.title || "CJ product"), description: String(product.description || "Curated product available from a CJ advertiser."), price: String(product.price?.amount || "View offer"), currency: String(product.price?.currency || "USD"), advertiserName: String(product.advertiserName || "CJ advertiser"), clickUrl: String(product.linkCode?.clickUrl || ""), imageUrl: images[index % images.length], syncedAt: new Date().toISOString() }));
