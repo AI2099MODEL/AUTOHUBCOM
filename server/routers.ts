@@ -22,6 +22,10 @@ import {
 } from "./socialScheduler";
 
 import {
+  autoScanAndParseLink,
+} from "./linkScanner";
+
+import {
   getRecommendedDeals,
   importDealToCatalog,
 } from "./dealsFetcher";
@@ -35,6 +39,12 @@ export const appRouter = router({
   catalog: router({
     active: publicProcedure.query(() => getActiveProducts()),
     bySlug: publicProcedure.input(z.object({ slug: z.string().min(1).max(160) })).query(({ input }) => getProductBySlug(input.slug)),
+    scanLink: publicProcedure
+      .input(z.object({ url: z.string().url() }))
+      .mutation(({ input }) => autoScanAndParseLink(input.url)),
+    batchScanLinks: publicProcedure
+      .input(z.object({ urls: z.array(z.string().url()) }))
+      .mutation(({ input }) => input.urls.map(url => autoScanAndParseLink(url))),
     recommendedDeals: publicProcedure
       .input(z.object({ category: z.string().optional(), minDiscount: z.number().optional() }))
       .query(({ input }) => getRecommendedDeals(input.category, input.minDiscount)),
