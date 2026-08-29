@@ -161,7 +161,8 @@ export default function Home() {
           </a>
 
           <nav className="hidden items-center gap-7 text-sm font-medium text-stone-600 md:flex">
-            <a href="#deals" className="transition hover:text-stone-950">Curated picks</a>
+            <a href="#shop" className="transition hover:text-stone-950">Our shop</a>
+            <a href="#deals" className="transition hover:text-stone-950">Curated deals</a>
             <a href="#stores" className="transition hover:text-stone-950">Store partners</a>
             <a href="#content" className="transition hover:text-stone-950">Field notes</a>
             <a href="#trust" className="transition hover:text-stone-950">Trust &amp; Disclosures</a>
@@ -311,7 +312,8 @@ export default function Home() {
         </section>
 
         {/* Product Catalog Grid */}
-        <section id="deals" className="scroll-mt-24 px-5 py-16 lg:px-8 lg:py-24">
+        <section id="shop" className="scroll-mt-24 px-5 py-16 lg:px-8 lg:py-24">
+          <div id="deals" className="scroll-mt-24" />
           <div className="mx-auto max-w-7xl">
             <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
