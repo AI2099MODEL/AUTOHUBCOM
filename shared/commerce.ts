@@ -404,6 +404,28 @@ export const HEALTH_BEAUTY_CATALOG: HealthBeautyItem[] = [
     tag: "100% Vegan Beauty",
     approvedForPublishing: true,
   },
+  {
+    id: "neutrogena-hydro-boost-water-gel",
+    slug: "neutrogena-hydro-boost-water-gel",
+    name: "Hydro Boost Water Gel with Hyaluronic Acid & Amino Acids (50g)",
+    brand: "Neutrogena",
+    category: "Skincare",
+    type: "affiliate",
+    priceUsd: 5.5,
+    priceInr: 440,
+    storeId: "flipkart",
+    storeName: "Flipkart Health & Beauty",
+    accent: "from-sky-100 via-blue-50 to-cyan-50",
+    score: 96,
+    keyBenefit: "72-hour continuous hydration boost, oil-free water gel formula with purified hyaluronic acid.",
+    skinType: "Dehydrated skin · Normal to Oily skin",
+    shipsWorldwide: false,
+    shipsIndia: true,
+    shippingNote: "Fast 2-3 Day India Express Delivery (Free over ₹500)",
+    affiliateUrl: "https://fkrt.co/pDEIvN",
+    tag: "Flipkart Top Pick",
+    approvedForPublishing: true,
+  },
 ];
 
 export function calculateShippingCharge(storeId: string, destination: "india" | "worldwide", cartTotalUsd: number) {
