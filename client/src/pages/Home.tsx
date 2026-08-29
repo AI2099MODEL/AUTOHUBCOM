@@ -21,7 +21,7 @@ export default function Home() {
   const [rakutenOpen, setRakutenOpen] = useState(false);
   const [impactOpen, setImpactOpen] = useState(false);
   const [form, setForm] = useState({ publisherId: "", websiteId: "", apiToken: "", deepLinkEndpoint: "https://link-search.api.cj.com/v2/link-search" });
-  const [cjSyncForm, setCjSyncForm] = useState({ companyId: "8057555", pid: "101872824", keyword: "beauty" });
+  const [cjSyncForm, setCjSyncForm] = useState({ companyId: "8057555", pid: "", keyword: "beauty" });
   const [syncMessage, setSyncMessage] = useState("");
   const [syncedProducts, setSyncedProducts] = useState<any[]>([]);
   const [awinForm, setAwinForm] = useState({ publisherId: "", advertiserId: "", apiToken: "", deeplinkEndpoint: "https://www.awin1.com/cread.php" });
