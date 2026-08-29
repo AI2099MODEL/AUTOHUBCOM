@@ -62,11 +62,34 @@ export const trackedLinks = mysqlTable("tracked_links", {
   productId: int("productId").notNull(),
   token: varchar("token", { length: 80 }).notNull().unique(),
   source: varchar("source", { length: 80 }).notNull(),
+  network: varchar("network", { length: 80 }).default("cj").notNull(),
+  externalLinkId: varchar("externalLinkId", { length: 180 }),
   campaign: varchar("campaign", { length: 120 }).notNull(),
   destinationUrl: text("destinationUrl").notNull(),
+  imageUrl: text("imageUrl"),
+  linkStatus: mysqlEnum("linkStatus", ["active", "expired", "paused", "needs_review"]).default("active").notNull(),
+  firstSeenAt: timestamp("firstSeenAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt"),
+  lastCheckedAt: timestamp("lastCheckedAt"),
+  lastCheckError: text("lastCheckError"),
   clickCount: int("clickCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (table) => ({ productIdx: index("tracked_links_product_idx").on(table.productId) }));
+}, (table) => ({ productIdx: index("tracked_links_product_idx").on(table.productId), lifecycleIdx: index("tracked_links_lifecycle_idx").on(table.network, table.linkStatus, table.lastCheckedAt) }));
+
+export const socialConnections = mysqlTable("social_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  platform: mysqlEnum("platform", ["meta", "youtube"]).notNull(),
+  accountId: varchar("accountId", { length: 180 }).notNull(),
+  accountName: varchar("accountName", { length: 255 }),
+  accessToken: text("accessToken").notNull(),
+  refreshToken: text("refreshToken"),
+  tokenExpiresAt: timestamp("tokenExpiresAt"),
+  scopes: text("scopes"),
+  status: mysqlEnum("status", ["connected", "expired", "revoked", "needs_review"]).default("connected").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({ platformIdx: index("social_connections_platform_idx").on(table.platform, table.status) }));
 
 export const contentPackages = mysqlTable("content_packages", {
   id: int("id").autoincrement().primaryKey(),
@@ -116,3 +139,5 @@ export type ContentPackage = typeof contentPackages.$inferSelect;
 export type InsertContentPackage = typeof contentPackages.$inferInsert;
 export type OfferSource = typeof offerSources.$inferSelect;
 export type Order = typeof orders.$inferSelect;
+export type TrackedLink = typeof trackedLinks.$inferSelect;
+export type SocialConnection = typeof socialConnections.$inferSelect;

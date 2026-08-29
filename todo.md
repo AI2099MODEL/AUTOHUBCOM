@@ -15,3 +15,12 @@
 - [ ] Create persisted content-package CRUD and channel-specific generation workflow
 - [ ] Implement attribution event capture and analytics queries driven by stored events
 - [ ] Add dedicated trust, privacy, and disclosure pages plus consent and claim-safety review controls
+
+## Current automation milestone
+
+- [ ] Extend database schema with durable CJ link registry, expiry fields, and social OAuth connections.
+- [ ] Add database helpers and protected registry/OAuth procedures.
+- [ ] Add automated expiry-check endpoint and scheduling instructions.
+- [ ] Add Meta Business Suite and YouTube Studio OAuth controls to the Control Room.
+- [ ] Create and validate reusable Janra affiliate/social automation skill.
+- [ ] Run type checks, tests, build, migration generation, and push changes.

@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, User, attributionEvents, contentPackages, products, users } from "../drizzle/schema";
+import { InsertUser, User, attributionEvents, contentPackages, products, users, trackedLinks, socialConnections } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -46,4 +46,38 @@ export async function getContentPackages() {
 export async function getAttributionSummary() {
   const db = await getDb(); if (!db) return [];
   return db.select({ platform: attributionEvents.platform, eventType: attributionEvents.eventType, total: sql<number>`count(*)` }).from(attributionEvents).groupBy(attributionEvents.platform, attributionEvents.eventType);
+}
+
+export async function upsertTrackedLink(input: { productId: number; token: string; source: string; network?: string; externalLinkId?: string; campaign: string; destinationUrl: string; imageUrl?: string; status?: "active" | "expired" | "paused" | "needs_review" }) {
+  const db = await getDb(); if (!db) return undefined;
+  const now = new Date();
+  const existing = await db.select().from(trackedLinks).where(eq(trackedLinks.token, input.token)).limit(1);
+  if (existing[0]) {
+    await db.update(trackedLinks).set({ destinationUrl: input.destinationUrl, imageUrl: input.imageUrl, linkStatus: input.status || "active", lastSeenAt: now, lastCheckedAt: now, lastCheckError: null }).where(eq(trackedLinks.id, existing[0].id));
+    return existing[0].id;
+  }
+  const result = await db.insert(trackedLinks).values({ productId: input.productId, token: input.token, source: input.source, network: input.network || "cj", externalLinkId: input.externalLinkId, campaign: input.campaign, destinationUrl: input.destinationUrl, imageUrl: input.imageUrl, linkStatus: input.status || "active", firstSeenAt: now, lastSeenAt: now, lastCheckedAt: now });
+  return result[0]?.insertId;
+}
+
+export async function getTrackedLinkLifecycle() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(trackedLinks).orderBy(sql`${trackedLinks.lastSeenAt} desc`).limit(500);
+}
+
+export async function markTrackedLinkCheck(id: number, ok: boolean, error?: string) {
+  const db = await getDb(); if (!db) return;
+  await db.update(trackedLinks).set({ lastCheckedAt: new Date(), linkStatus: ok ? "active" : "expired", lastCheckError: ok ? null : (error || "Link check failed") }).where(eq(trackedLinks.id, id));
+}
+
+export async function saveSocialConnection(input: { platform: "meta" | "youtube"; accountId: string; accountName?: string; accessToken: string; refreshToken?: string; tokenExpiresAt?: Date; scopes?: string }) {
+  const db = await getDb(); if (!db) return undefined;
+  const existing = await db.select().from(socialConnections).where(eq(socialConnections.accountId, input.accountId)).limit(1);
+  if (existing[0]) { await db.update(socialConnections).set({ ...input, status: "connected" }).where(eq(socialConnections.id, existing[0].id)); return existing[0].id; }
+  const result = await db.insert(socialConnections).values({ ...input, status: "connected" }); return result[0]?.insertId;
+}
+
+export async function getSocialConnections() {
+  const db = await getDb(); if (!db) return [];
+  return db.select({ id: socialConnections.id, platform: socialConnections.platform, accountId: socialConnections.accountId, accountName: socialConnections.accountName, tokenExpiresAt: socialConnections.tokenExpiresAt, scopes: socialConnections.scopes, status: socialConnections.status, updatedAt: socialConnections.updatedAt }).from(socialConnections).orderBy(sql`${socialConnections.updatedAt} desc`);
 }
