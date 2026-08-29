@@ -23,6 +23,7 @@ import {
   HEALTH_BEAUTY_CATALOG,
   STORE_PARTNERS,
   calculateShippingCharge,
+  isNewlyAdded,
 } from "../../../shared/commerce";
 
 export default function ProductDetail() {
@@ -85,32 +86,48 @@ export default function ProductDetail() {
 
       <main className="mx-auto grid max-w-5xl gap-10 px-5 py-10 lg:grid-cols-2 lg:py-16">
         {/* Left Column: Product Visual Card */}
-        <div className={`flex min-h-[420px] flex-col justify-between rounded-[2rem] bg-gradient-to-br ${product.accent} p-8 shadow-[0_24px_70px_rgba(40,31,20,0.1)]`}>
-          <div className="flex items-center justify-between">
-            <Badge className="bg-white/85 text-stone-800 backdrop-blur font-semibold">
-              {product.category}
-            </Badge>
-            <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-bold text-amber-200">
-              {product.brand}
-            </span>
-          </div>
+        <div className="flex flex-col gap-4">
+          <div className="relative min-h-[420px] overflow-hidden rounded-[2rem] bg-stone-900 shadow-[0_24px_70px_rgba(40,31,20,0.1)]">
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/20 to-stone-950/50" />
 
-          <div className="my-8 rounded-2xl bg-white/70 p-6 backdrop-blur shadow-xs">
-            <div className="text-xs font-bold uppercase tracking-widest text-stone-500">Curated Merchant</div>
-            <div className="mt-1 text-xl font-bold text-stone-950 flex items-center gap-2">
-              <Store className="h-5 w-5 text-stone-700" />
-              {product.storeName}
+            <div className="absolute left-6 right-6 top-6 flex items-center justify-between">
+              <Badge className="bg-white/90 text-stone-900 backdrop-blur font-bold text-xs">
+                {product.category}
+              </Badge>
+              <div className="flex items-center gap-2">
+                {isNewlyAdded(product.createdAt) && (
+                  <span className="rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-3 py-1 text-[10px] font-extrabold uppercase text-white shadow-md">
+                    ✨ NEW TODAY
+                  </span>
+                )}
+                <span className="rounded-full bg-stone-950/90 px-3 py-1 text-xs font-bold text-amber-200">
+                  {product.brand}
+                </span>
+              </div>
             </div>
-            <p className="mt-2 text-xs text-stone-600">
-              Affiliate Network: <span className="font-semibold text-stone-800">{store.affiliateNetwork}</span>
-            </p>
+
+            <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-stone-950/80 p-5 backdrop-blur-md border border-white/10 shadow-lg text-white">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-amber-300">Verified Merchant</div>
+              <div className="mt-1 text-lg font-bold flex items-center gap-2 text-stone-100">
+                <Store className="h-4 w-4 text-amber-300" />
+                {product.storeName}
+              </div>
+              <p className="mt-1 text-xs text-stone-300">
+                Affiliate Network: <span className="font-semibold text-amber-100">{store.affiliateNetwork}</span>
+              </p>
+            </div>
           </div>
 
           {/* Social Quick-Publish Buttons */}
-          <div className="rounded-2xl bg-stone-950/90 p-4 text-white">
+          <div className="rounded-2xl bg-stone-950 p-5 text-white">
             <div className="text-xs font-semibold text-amber-200 flex items-center gap-1.5">
               <Send className="h-3.5 w-3.5" />
-              Step 2: Auto-Publish this Item
+              Auto-Publish to Brand Janra Channels
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button

@@ -39,6 +39,7 @@ import {
   RecommendedDeal,
   STORE_PARTNERS,
   calculateShippingCharge,
+  isNewlyAdded,
 } from "../../../shared/commerce";
 
 const channels = [
@@ -60,23 +61,41 @@ function HealthBeautyProductCard({
 }) {
   const shipping = calculateShippingCharge(product.storeId, destination, product.priceUsd);
   const formattedPrice = currency === "USD" ? `$${product.priceUsd.toFixed(2)}` : `₹${product.priceInr.toLocaleString()}`;
+  const isNew = isNewlyAdded(product.createdAt);
 
   return (
-    <Card className="group flex flex-col justify-between overflow-hidden border-stone-200/80 bg-white/90 shadow-[0_18px_60px_rgba(40,31,20,0.06)] backdrop-blur transition duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(40,31,20,0.12)]">
+    <Card className="group flex flex-col justify-between overflow-hidden border-stone-200/80 bg-white/95 shadow-[0_18px_60px_rgba(40,31,20,0.06)] backdrop-blur transition duration-200 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(40,31,20,0.12)]">
       <div>
-        <div className={`relative flex h-48 flex-col justify-between bg-gradient-to-br ${product.accent} p-5`}>
-          <div className="flex items-center justify-between">
-            <span className="rounded-full bg-white/85 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-800 shadow-sm backdrop-blur">
+        {/* Product Image Header with Store & Newly Added Badges */}
+        <div className="relative h-56 w-full overflow-hidden bg-stone-100">
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-stone-950/20 to-stone-950/40" />
+
+          {/* Top Badges */}
+          <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
+            <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-stone-900 shadow-sm backdrop-blur">
               {product.category}
             </span>
-            <span className="rounded-full bg-stone-950/80 px-2.5 py-0.5 text-[10px] font-medium text-amber-200">
-              {product.brand}
-            </span>
+            {isNew && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md">
+                ✨ NEW TODAY
+              </span>
+            )}
           </div>
-          <div>
-            <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-stone-900 shadow-xs">
-              <Store className="h-3 w-3 text-stone-600" />
+
+          {/* Bottom Store Partner Badge */}
+          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-950/90 px-3 py-1 text-xs font-bold text-amber-200 shadow-md backdrop-blur">
+              <Store className="h-3.5 w-3.5 text-amber-300" />
               {product.storeName}
+            </span>
+            <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-bold text-stone-900">
+              {product.brand}
             </span>
           </div>
         </div>
@@ -86,10 +105,10 @@ function HealthBeautyProductCard({
             <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 font-medium text-[11px]">
               {product.tag}
             </Badge>
-            <span className="text-base font-bold text-stone-950">{formattedPrice}</span>
+            <span className="text-lg font-extrabold text-stone-950">{formattedPrice}</span>
           </div>
 
-          <h3 className="text-base font-semibold leading-snug tracking-tight text-stone-950 group-hover:text-amber-950">
+          <h3 className="text-base font-bold leading-snug tracking-tight text-stone-950 group-hover:text-amber-950">
             {product.name}
           </h3>
           <p className="mt-2 text-xs leading-5 text-stone-600 line-clamp-2">{product.keyBenefit}</p>
@@ -344,23 +363,32 @@ export default function Home() {
         </section>
 
         {/* Store Partners Bar */}
-        <section id="stores" className="border-y border-stone-200/80 bg-white/60 px-5 py-6 lg:px-8">
+        <section id="stores" className="border-y border-stone-200/80 bg-white/70 px-5 py-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-stone-500">
-              Curated Across Verified Affiliate Merchants
+              Curated Across Verified Affiliate Store Partners
             </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-stone-700 sm:gap-10">
-              <span className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 shadow-xs">
-                🌿 iHerb (150+ Countries · Free &gt; $40)
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-xs font-bold text-stone-800 sm:gap-4">
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                🏪 Flipkart Health (Free &gt; ₹500)
               </span>
-              <span className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 shadow-xs">
-                💄 Nykaa (India Express · Free &gt; ₹499)
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                🏪 Ajio Beauty &amp; Luxury (Free &gt; ₹799)
               </span>
-              <span className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 shadow-xs">
-                📦 Amazon Global &amp; Amazon India
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                🏪 Nykaa (India Express · Free &gt; ₹499)
               </span>
-              <span className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 shadow-xs">
-                ✨ Sephora &amp; LookFantastic
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                🏪 Tira Beauty (Reliance)
+              </span>
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                🌿 iHerb Global (150+ Countries)
+              </span>
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                ✨ ExtraPe Verified Deals Hub
+              </span>
+              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
+                📦 Amazon Global &amp; India
               </span>
             </div>
           </div>
@@ -378,65 +406,88 @@ export default function Home() {
                   Curated Partner Deals (Up to 26% OFF)
                 </h2>
                 <p className="mt-2 text-sm text-stone-400">
-                  Live trending offers from Tira Beauty, Foxtale, Tata 1mg, Purplle, Myntra, and iHerb.
+                  Live trending offers from Flipkart, Ajio, Tira Beauty, Foxtale, Tata 1mg, Purplle, Myntra, and iHerb.
                 </p>
               </div>
             </div>
 
             <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {RECOMMENDED_DEALS_POOL.map((deal) => (
-                <div
-                  key={deal.id}
-                  className="group relative flex flex-col justify-between rounded-2xl border border-stone-800 bg-stone-950 p-5 transition-all hover:border-amber-400/40 hover:shadow-xl"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="rounded-md bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-300">
-                        {deal.storeName}
-                      </span>
-                      <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-extrabold text-white">
-                        {deal.discountPercent}% OFF
-                      </span>
+              {RECOMMENDED_DEALS_POOL.map((deal) => {
+                const isNew = isNewlyAdded(deal.createdAt);
+                return (
+                  <div
+                    key={deal.id}
+                    className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 transition-all hover:border-amber-400/40 hover:shadow-xl"
+                  >
+                    <div>
+                      {/* Deal Image with Store Badge */}
+                      <div className="relative h-48 w-full overflow-hidden bg-stone-900">
+                        <img
+                          src={deal.imageUrl}
+                          alt={deal.name}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/20 to-stone-950/40" />
+
+                        <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
+                          <span className="rounded-md bg-stone-950/80 px-2.5 py-1 text-[11px] font-bold text-amber-300 backdrop-blur">
+                            🏪 {deal.storeName}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {isNew && (
+                              <span className="rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-white shadow-md">
+                                ✨ NEW
+                              </span>
+                            )}
+                            <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-extrabold text-white">
+                              {deal.discountPercent}% OFF
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5">
+                        <h3 className="text-base font-bold leading-snug text-stone-100 group-hover:text-amber-200">
+                          {deal.name}
+                        </h3>
+                        <p className="mt-1 text-xs font-medium text-stone-400">
+                          By {deal.brand} · {deal.category}
+                        </p>
+
+                        <p className="mt-3 text-xs leading-relaxed text-stone-400 line-clamp-2">
+                          {deal.keyBenefit}
+                        </p>
+                      </div>
                     </div>
 
-                    <h3 className="mt-3 text-base font-bold leading-snug text-stone-100 group-hover:text-amber-200">
-                      {deal.name}
-                    </h3>
-                    <p className="mt-1 text-xs font-medium text-stone-400">
-                      By {deal.brand} · {deal.category}
-                    </p>
-
-                    <p className="mt-3 text-xs leading-relaxed text-stone-400">
-                      {deal.keyBenefit}
-                    </p>
-                  </div>
-
-                  <div className="mt-5 border-t border-stone-800/80 pt-4">
-                    <div className="flex items-baseline justify-between">
-                      <div>
-                        <span className="text-lg font-extrabold text-white">
-                          {currency === "USD" ? `$${deal.dealPriceUsd.toFixed(2)}` : `₹${deal.dealPriceInr.toLocaleString()}`}
-                        </span>
-                        <span className="ml-2 text-xs text-stone-500 line-through">
-                          {currency === "USD" ? `$${deal.originalPriceUsd.toFixed(2)}` : `₹${deal.originalPriceInr.toLocaleString()}`}
+                    <div className="border-t border-stone-800/80 p-5 pt-4">
+                      <div className="flex items-baseline justify-between">
+                        <div>
+                          <span className="text-lg font-extrabold text-white">
+                            {currency === "USD" ? `$${deal.dealPriceUsd.toFixed(2)}` : `₹${deal.dealPriceInr.toLocaleString()}`}
+                          </span>
+                          <span className="ml-2 text-xs text-stone-500 line-through">
+                            {currency === "USD" ? `$${deal.originalPriceUsd.toFixed(2)}` : `₹${deal.originalPriceInr.toLocaleString()}`}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-emerald-400">
+                          ★ {deal.rating} ({deal.reviewsCount.toLocaleString()})
                         </span>
                       </div>
-                      <span className="text-[11px] text-emerald-400">
-                        ★ {deal.rating} ({deal.reviewsCount.toLocaleString()})
-                      </span>
-                    </div>
 
-                    <a
-                      href={deal.affiliateUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 py-2.5 text-xs font-bold text-stone-950 transition hover:bg-amber-200"
-                    >
-                      Shop Verified Deal <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                      <a
+                        href={deal.affiliateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-bold text-stone-950 transition hover:bg-amber-300"
+                      >
+                        Grab Deal on {deal.storeName.split(" ")[0]} <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
