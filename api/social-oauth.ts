@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const returnedState = String(req.query.state || ""); const cookieHeader = String(req.headers.cookie || ""); const cookieState = cookieHeader.match(/(?:^|;\s*)janra_oauth_state=([^;]+)/)?.[1] || "";
   if (!returnedState || returnedState !== cookieState) return error(res, "OAuth state validation failed. Restart the connection from the Control Room.");
   try {
-    const { saveSocialConnection } = await import("../server/db");
+    const { saveSocialConnection } = await import("../server/db.js");
     if (provider === "meta") {
       const tokenResponse = await fetch("https://graph.facebook.com/v22.0/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: process.env.META_APP_ID || "", client_secret: process.env.META_APP_SECRET || "", redirect_uri: redirectUri, code }) });
       const token = await tokenResponse.json() as { access_token?: string; error?: { message?: string } }; if (!token.access_token) return error(res, token.error?.message || "Meta did not return an access token.");

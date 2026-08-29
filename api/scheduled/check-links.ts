@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorization = String(req.headers.authorization || "");
   if (expected && authorization !== `Bearer ${expected}`) return res.status(401).json({ ok: false, message: "Unauthorized." });
   try {
-    const { getTrackedLinkLifecycle, markTrackedLinkCheck } = await import("../../server/db");
+    const { getTrackedLinkLifecycle, markTrackedLinkCheck } = await import("../../server/db.js");
     const links = (await getTrackedLinkLifecycle()).filter((link) => link.linkStatus === "active").slice(0, 100);
     let active = 0; let expired = 0;
     for (const link of links) {
