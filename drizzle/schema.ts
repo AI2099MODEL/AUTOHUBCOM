@@ -34,6 +34,29 @@ export const products = mysqlTable("products", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ({ statusIdx: index("products_status_idx").on(table.status), typeIdx: index("products_type_idx").on(table.productType) }));
 
+export const offerSources = mysqlTable("offer_sources", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  sourceType: mysqlEnum("sourceType", ["affiliate", "supplier"]).notNull(),
+  endpointUrl: text("endpointUrl").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  lastCheckedAt: timestamp("lastCheckedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const orders = mysqlTable("orders", {
+  id: int("id").autoincrement().primaryKey(),
+  productId: int("productId").notNull(),
+  orderReference: varchar("orderReference", { length: 80 }).notNull().unique(),
+  customerName: varchar("customerName", { length: 160 }).notNull(),
+  customerEmail: varchar("customerEmail", { length: 320 }).notNull(),
+  status: mysqlEnum("status", ["pending", "paid", "fulfilled", "cancelled"]).default("pending").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+  consentGiven: boolean("consentGiven").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const trackedLinks = mysqlTable("tracked_links", {
   id: int("id").autoincrement().primaryKey(),
   productId: int("productId").notNull(),
@@ -91,3 +114,5 @@ export type Product = typeof products.$inferSelect;
 export type InsertProduct = typeof products.$inferInsert;
 export type ContentPackage = typeof contentPackages.$inferSelect;
 export type InsertContentPackage = typeof contentPackages.$inferInsert;
+export type OfferSource = typeof offerSources.$inferSelect;
+export type Order = typeof orders.$inferSelect;

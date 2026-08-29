@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getActiveProducts, getAttributionSummary, getContentPackages } from "./db";
+import { createDirectOrder, getAnalyticsSummary, getProductBySlug } from "./commerceService";
 
 export const appRouter = router({
   system: systemRouter,
@@ -13,10 +14,13 @@ export const appRouter = router({
   }),
   catalog: router({
     active: publicProcedure.query(() => getActiveProducts()),
+    bySlug: publicProcedure.input(z.object({ slug: z.string().min(1).max(160) })).query(({ input }) => getProductBySlug(input.slug)),
+    createDirectOrder: publicProcedure.input(z.object({ slug: z.string().min(1), customerName: z.string().trim().min(2).max(160), customerEmail: z.string().email().max(320), consentGiven: z.boolean() })).mutation(({ input }) => createDirectOrder(input)),
   }),
   operations: router({
     contentPackages: protectedProcedure.input(z.object({})).query(() => getContentPackages()),
     attributionSummary: protectedProcedure.query(() => getAttributionSummary()),
+    analyticsSummary: protectedProcedure.query(() => getAnalyticsSummary()),
   }),
 });
 
