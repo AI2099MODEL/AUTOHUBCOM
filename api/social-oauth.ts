@@ -9,6 +9,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = String(req.query.action || "start");
   if (!["meta", "youtube"].includes(provider)) return error(res, "Unknown social provider.");
   if (action === "start") {
+    if (provider === "meta" && (!process.env.META_APP_ID || !process.env.META_APP_SECRET)) return error(res, "Meta OAuth is not configured. Add META_APP_ID and META_APP_SECRET to the deployment.");
+    if (provider === "youtube" && (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET)) return error(res, "YouTube OAuth is not configured. Add YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET to the deployment.");
     const state = Buffer.from(JSON.stringify({ provider, createdAt: Date.now() })).toString("base64url");
     res.setHeader("Set-Cookie", `janra_oauth_state=${state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
     if (provider === "meta") {
@@ -19,6 +21,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   }
   const code = String(req.query.code || ""); if (!code) return error(res, "OAuth provider did not return an authorization code.");
+  const returnedState = String(req.query.state || ""); const cookieHeader = String(req.headers.cookie || ""); const cookieState = cookieHeader.match(/(?:^|;\s*)janra_oauth_state=([^;]+)/)?.[1] || "";
+  if (!returnedState || returnedState !== cookieState) return error(res, "OAuth state validation failed. Restart the connection from the Control Room.");
   try {
     if (provider === "meta") {
       const tokenResponse = await fetch("https://graph.facebook.com/v22.0/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: process.env.META_APP_ID || "", client_secret: process.env.META_APP_SECRET || "", redirect_uri: redirectUri, code }) });
