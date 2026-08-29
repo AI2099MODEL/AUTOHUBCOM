@@ -147,6 +147,7 @@ export default function Home() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [destination, setDestination] = useState<"worldwide" | "india">("worldwide");
   const [currency, setCurrency] = useState<"USD" | "INR">("USD");
+  const [activeTab, setActiveTab] = useState("storefront");
   const [catalogProducts, setCatalogProducts] = useState<HealthBeautyItem[]>(HEALTH_BEAUTY_CATALOG);
   const [selectedStudioProduct, setSelectedStudioProduct] = useState<HealthBeautyItem>(HEALTH_BEAUTY_CATALOG[0]);
 
