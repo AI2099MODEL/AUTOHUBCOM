@@ -26,6 +26,13 @@ import {
 } from "./linkScanner";
 
 import {
+  addAffiliateSource,
+  getAffiliateSources,
+  removeAffiliateSource,
+  runHourlyScan,
+} from "./affiliateRegistry";
+
+import {
   getRecommendedDeals,
   importDealToCatalog,
 } from "./dealsFetcher";
@@ -39,6 +46,14 @@ export const appRouter = router({
   catalog: router({
     active: publicProcedure.query(() => getActiveProducts()),
     bySlug: publicProcedure.input(z.object({ slug: z.string().min(1).max(160) })).query(({ input }) => getProductBySlug(input.slug)),
+    getSources: publicProcedure.query(() => getAffiliateSources()),
+    addSource: publicProcedure
+      .input(z.object({ url: z.string().url(), label: z.string().optional() }))
+      .mutation(({ input }) => addAffiliateSource(input.url, input.label)),
+    removeSource: publicProcedure
+      .input(z.object({ sourceId: z.string() }))
+      .mutation(({ input }) => removeAffiliateSource(input.sourceId)),
+    runHourlyScanNow: publicProcedure.mutation(() => runHourlyScan()),
     scanLink: publicProcedure
       .input(z.object({ url: z.string().url() }))
       .mutation(({ input }) => autoScanAndParseLink(input.url)),

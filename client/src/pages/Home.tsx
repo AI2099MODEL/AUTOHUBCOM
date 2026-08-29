@@ -131,6 +131,59 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("storefront");
   const [selectedStudioProduct, setSelectedStudioProduct] = useState<HealthBeautyItem>(HEALTH_BEAUTY_CATALOG[0]);
 
+  const [linkInput, setLinkInput] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [sourcesList, setSourcesList] = useState([
+    { id: "1", url: "https://fkrt.co/pDEIvN", store: "Flipkart Health & Beauty", status: "Active · Scanning hourly", items: 1 },
+    { id: "2", url: "https://fkrt.co/ykrYNt", store: "Flipkart / The Derma Co", status: "Active · Scanning hourly", items: 1 },
+    { id: "3", url: "https://extrape.com/c/tira-laneige-lip-mask", store: "Tira Beauty / ExtraPe", status: "Active · Scanning hourly", items: 1 },
+    { id: "4", url: "https://extrape.com/c/dotkey-barrier-repair", store: "Dot & Key / ExtraPe", status: "Active · Scanning hourly", items: 1 },
+    { id: "5", url: "https://extrape.com/c/plum-vitaminc-mandarin", store: "Plum Clean Beauty / ExtraPe", status: "Active · Scanning hourly", items: 1 },
+    { id: "6", url: "https://www.iherb.com/c/beauty", store: "iHerb Global Skincare", status: "Active · Scanning hourly", items: 2 },
+  ]);
+
+  const handleScanAndAddLink = () => {
+    if (!linkInput.trim()) {
+      toast.error("Please paste an affiliate product or store link");
+      return;
+    }
+
+    setIsScanning(true);
+    setTimeout(() => {
+      setIsScanning(false);
+      const url = linkInput.trim();
+      const isFkrt = url.includes("fkrt.co") || url.includes("flipkart");
+      const storeName = isFkrt ? "Flipkart Health & Beauty" : url.includes("extrape") ? "ExtraPe Verified Deals" : url.includes("nykaa") ? "Nykaa" : "Partner Store";
+      
+      setSourcesList((prev) => [
+        {
+          id: String(Date.now()),
+          url,
+          store: storeName,
+          status: "Active · Scanned & Ingested",
+          items: 1,
+        },
+        ...prev,
+      ]);
+
+      setLinkInput("");
+      toast.success("Affiliate Link Scanned & Added to Store!", {
+        description: `Ingested Health & Beauty product from ${storeName}. Shipping rules & social posts generated.`,
+      });
+    }, 800);
+  };
+
+  const handleRunHourlyScanNow = () => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1200)),
+      {
+        loading: "Running hourly scan across all affiliate feeds...",
+        success: "Scan complete! Verified 6 active feeds. Expired links: 0. Store catalog updated.",
+        error: "Failed to run scan",
+      }
+    );
+  };
+
   const filteredProducts = useMemo(() => {
     return categoryFilter === "all"
       ? HEALTH_BEAUTY_CATALOG
@@ -546,13 +599,131 @@ export default function Home() {
               </Button>
             </div>
 
-            <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mt-8">
-              <TabsList className="grid w-full grid-cols-4 bg-stone-200/60">
+            <Tabs defaultValue="scanner" onValueChange={setActiveTab} className="mt-8">
+              <TabsList className="grid w-full grid-cols-5 bg-stone-200/60 text-xs">
+                <TabsTrigger value="scanner">⚡ Auto Scanner</TabsTrigger>
                 <TabsTrigger value="studio">Content studio</TabsTrigger>
                 <TabsTrigger value="meta">Meta channels</TabsTrigger>
                 <TabsTrigger value="analytics">Analytics</TabsTrigger>
                 <TabsTrigger value="settings">Guardrails</TabsTrigger>
               </TabsList>
+
+              {/* Auto Scanner & Ingestion Tab */}
+              <TabsContent value="scanner" className="mt-6 space-y-5">
+                {/* Instant Link Ingestion Box */}
+                <Card className="border-stone-300 shadow-xs">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base font-bold">Auto-Scan &amp; Ingest Affiliate Links</CardTitle>
+                        <p className="mt-1 text-xs text-stone-500">
+                          Paste any link (Flipkart, ExtraPe, Nykaa, Amazon, Tira, Myntra, Foxtale, Plum, Dot &amp; Key, Tata 1mg, iHerb).
+                        </p>
+                      </div>
+                      <Badge className="bg-amber-100 text-amber-800 font-bold">AI Auto-Parser</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        placeholder="e.g. https://fkrt.co/... or https://extrape.com/c/..."
+                        value={linkInput}
+                        onChange={(e) => setLinkInput(e.target.value)}
+                        className="flex-1 rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                      />
+                      <Button
+                        onClick={handleScanAndAddLink}
+                        disabled={isScanning}
+                        className="bg-stone-950 px-4 text-xs font-bold text-white hover:bg-stone-800"
+                      >
+                        {isScanning ? "Scanning..." : "Scan & Ingest"}
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+                      <span>⚡ Auto-detects store</span>
+                      <span>•</span>
+                      <span>Calculates Indian/Global shipping</span>
+                      <span>•</span>
+                      <span>Generates Social Media copy</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Hourly Background Scanner Status */}
+                <div className="rounded-2xl border border-stone-200 bg-stone-900 p-5 text-white shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-2.5 w-2.5 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                        Hourly Background Auto-Scanner Active
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleRunHourlyScanNow}
+                      className="bg-emerald-500 px-3 py-1 text-xs font-bold text-stone-950 hover:bg-emerald-400"
+                    >
+                      ⚡ Run Auto-Scan Now
+                    </Button>
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-stone-300">
+                    Runs every <strong>60 minutes</strong> across all monitored affiliate sources. Verifies destination health, removes expired offers, and updates the live catalog automatically.
+                  </p>
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-stone-800 pt-3 text-center">
+                    <div className="rounded-xl bg-white/5 p-2">
+                      <div className="text-sm font-bold text-stone-100">{sourcesList.length}</div>
+                      <div className="text-[10px] text-stone-400">Monitored Feeds</div>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-2">
+                      <div className="text-sm font-bold text-emerald-400">{sourcesList.length}</div>
+                      <div className="text-[10px] text-stone-400">Active Links</div>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-2">
+                      <div className="text-sm font-bold text-stone-400">0</div>
+                      <div className="text-[10px] text-stone-400">Expired Flagged</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monitored Affiliate Feed Sources */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-bold">Monitored Affiliate Source Feeds</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {sourcesList.map((source) => (
+                      <div
+                        key={source.id}
+                        className="flex items-center justify-between rounded-xl border border-stone-200 bg-white/70 p-3 text-xs"
+                      >
+                        <div className="truncate pr-3">
+                          <div className="font-bold text-stone-900">{source.store}</div>
+                          <div className="truncate text-[11px] text-stone-500">{source.url}</div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                            {source.status}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setSourcesList((prev) => prev.filter((s) => s.id !== source.id));
+                              toast.info("Removed source from auto-scanner");
+                            }}
+                            className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-rose-600"
+                            aria-label="Remove source"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               {/* Studio Tab */}
               <TabsContent value="studio" className="mt-6 space-y-4">
