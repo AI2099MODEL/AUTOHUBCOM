@@ -35,6 +35,8 @@ import {
 import {
   HEALTH_BEAUTY_CATALOG,
   HealthBeautyItem,
+  RECOMMENDED_DEALS_POOL,
+  RecommendedDeal,
   STORE_PARTNERS,
   calculateShippingCharge,
 } from "../../../shared/commerce";
@@ -307,6 +309,81 @@ export default function Home() {
               <span className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 shadow-xs">
                 ✨ Sephora &amp; LookFantastic
               </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Recommended Deals Section */}
+        <section className="border-b border-stone-200/80 bg-stone-900 px-5 py-14 text-white lg:px-8 lg:py-18">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+              <div>
+                <span className="inline-flex items-center gap-2 rounded-full bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-widest text-rose-300">
+                  <Sparkles className="h-3.5 w-3.5" /> High-Discount Recommended Deals
+                </span>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+                  Curated Partner Deals (Up to 26% OFF)
+                </h2>
+                <p className="mt-2 text-sm text-stone-400">
+                  Live trending offers from Tira Beauty, Foxtale, Tata 1mg, Purplle, Myntra, and iHerb.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {RECOMMENDED_DEALS_POOL.map((deal) => (
+                <div
+                  key={deal.id}
+                  className="group relative flex flex-col justify-between rounded-2xl border border-stone-800 bg-stone-950 p-5 transition-all hover:border-amber-400/40 hover:shadow-xl"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="rounded-md bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-300">
+                        {deal.storeName}
+                      </span>
+                      <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-extrabold text-white">
+                        {deal.discountPercent}% OFF
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-base font-bold leading-snug text-stone-100 group-hover:text-amber-200">
+                      {deal.name}
+                    </h3>
+                    <p className="mt-1 text-xs font-medium text-stone-400">
+                      By {deal.brand} · {deal.category}
+                    </p>
+
+                    <p className="mt-3 text-xs leading-relaxed text-stone-400">
+                      {deal.keyBenefit}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 border-t border-stone-800/80 pt-4">
+                    <div className="flex items-baseline justify-between">
+                      <div>
+                        <span className="text-lg font-extrabold text-white">
+                          {currency === "USD" ? `$${deal.dealPriceUsd.toFixed(2)}` : `₹${deal.dealPriceInr.toLocaleString()}`}
+                        </span>
+                        <span className="ml-2 text-xs text-stone-500 line-through">
+                          {currency === "USD" ? `$${deal.originalPriceUsd.toFixed(2)}` : `₹${deal.originalPriceInr.toLocaleString()}`}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-emerald-400">
+                        ★ {deal.rating} ({deal.reviewsCount.toLocaleString()})
+                      </span>
+                    </div>
+
+                    <a
+                      href={deal.affiliateUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 py-2.5 text-xs font-bold text-stone-950 transition hover:bg-amber-200"
+                    >
+                      Shop Verified Deal <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

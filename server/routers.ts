@@ -21,6 +21,11 @@ import {
   getSchedulerQueue,
 } from "./socialScheduler";
 
+import {
+  getRecommendedDeals,
+  importDealToCatalog,
+} from "./dealsFetcher";
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -30,6 +35,12 @@ export const appRouter = router({
   catalog: router({
     active: publicProcedure.query(() => getActiveProducts()),
     bySlug: publicProcedure.input(z.object({ slug: z.string().min(1).max(160) })).query(({ input }) => getProductBySlug(input.slug)),
+    recommendedDeals: publicProcedure
+      .input(z.object({ category: z.string().optional(), minDiscount: z.number().optional() }))
+      .query(({ input }) => getRecommendedDeals(input.category, input.minDiscount)),
+    importRecommendedDeal: publicProcedure
+      .input(z.object({ dealId: z.string() }))
+      .mutation(({ input }) => importDealToCatalog(input.dealId)),
     createDirectOrder: publicProcedure.input(z.object({ slug: z.string().min(1), customerName: z.string().trim().min(2).max(160), customerEmail: z.string().email().max(320), consentGiven: z.boolean() })).mutation(({ input }) => createDirectOrder(input)),
   }),
   operations: router({
