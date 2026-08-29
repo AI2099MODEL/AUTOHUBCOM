@@ -39,6 +39,9 @@ export function detectStoreFromUrl(url: string): { storeId: string; storeName: s
   if (lower.includes("myntra.com")) {
     return { storeId: "myntra", storeName: "Myntra Beauty" };
   }
+  if (lower.includes("ajio.com") || lower.includes("ajio")) {
+    return { storeId: "ajio", storeName: "Ajio Beauty & Luxury" };
+  }
   if (lower.includes("1mg.com") || lower.includes("tata1mg")) {
     return { storeId: "tata1mg", storeName: "Tata 1mg Wellness" };
   }
