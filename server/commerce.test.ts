@@ -30,7 +30,7 @@ describe("commerce rules", () => {
     const instagram = createContentDraft({ productName: "Halo Desk Light", category: "Workspace", reasonToConsider: "Its compact footprint keeps a small desk calmer.", productSlug: "halo-desk-light", source: "instagram", campaign: "august-edit", affiliate: true });
     const youtube = createContentDraft({ productName: "Halo Desk Light", category: "Workspace", reasonToConsider: "Its compact footprint keeps a small desk calmer.", productSlug: "halo-desk-light", source: "youtube", campaign: "august-edit", affiliate: true });
     expect(instagram.script).toContain("Hook");
-    expect(youtube.title).toContain("what to know");
+    expect(youtube.title).toContain("Review");
     expect(instagram.disclosure).toContain("commission");
     expect(instagram.trackingUrl).toContain("src=instagram");
   });

@@ -15,6 +15,12 @@ import {
   verifyMetaConnection,
 } from "./socialService";
 
+import {
+  executeAllQueuedPosts,
+  executeScheduledPost,
+  getSchedulerQueue,
+} from "./socialScheduler";
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -33,6 +39,11 @@ export const appRouter = router({
   }),
   social: router({
     status: publicProcedure.query(() => getSocialStatus()),
+    getQueue: publicProcedure.query(() => getSchedulerQueue()),
+    executeScheduled: publicProcedure
+      .input(z.object({ postId: z.string() }))
+      .mutation(({ input }) => executeScheduledPost(input.postId)),
+    executeAllQueued: publicProcedure.mutation(() => executeAllQueuedPosts()),
     verify: publicProcedure
       .input(z.object({ accessToken: z.string().optional() }))
       .mutation(({ input }) => verifyMetaConnection(input.accessToken)),
