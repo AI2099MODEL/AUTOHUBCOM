@@ -1,0 +1,25 @@
+import { Link, useLocation } from "wouter";
+import { ArrowLeft, ArrowUpRight, Check, Link2, ShieldCheck, ShoppingBag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
+
+const catalog = {
+  "halo-desk-light": { name: "Halo Desk Light", category: "Workspace", type: "affiliate", price: "$42", accent: "from-amber-200 via-orange-100 to-rose-100", note: "Curated partner offer", destination: "Partner destination" },
+  "arc-travel-kit": { name: "Arc Travel Kit", category: "Travel", type: "affiliate", price: "$68", accent: "from-sky-200 via-cyan-100 to-indigo-100", note: "Tracked offer destination", destination: "Partner destination" },
+  "linen-organizer": { name: "Linen Drawer Set", category: "Home", type: "direct", price: "$36", accent: "from-emerald-200 via-teal-100 to-lime-100", note: "Ships from our store", destination: "Store checkout" },
+  "quiet-carry": { name: "Quiet Carry Pouch", category: "Everyday", type: "direct", price: "$28", accent: "from-violet-200 via-fuchsia-100 to-pink-100", note: "Direct checkout product", destination: "Store checkout" },
+} as const;
+
+export default function ProductDetail() {
+  const [location, setLocation] = useLocation();
+  const slug = location.split("/").filter(Boolean).pop() ?? "";
+  const product = catalog[slug as keyof typeof catalog];
+  if (!product) return <div className="min-h-screen bg-[#f8f6f1] p-8"><Link href="/">Back to storefront</Link><h1 className="mt-10 text-4xl font-semibold">Product not found</h1></div>;
+  const affiliate = product.type === "affiliate";
+  const action = () => {
+    toast.success(affiliate ? "Outbound link recorded" : "Checkout request captured", { description: affiliate ? "This destination is attributed to your product and channel campaign." : "Payment and fulfillment connectors can be enabled when your store is ready." });
+  };
+  return <div className="min-h-screen bg-[#f8f6f1] text-stone-950"><header className="border-b border-stone-200 bg-white/70 px-5 py-4"><div className="mx-auto max-w-5xl"><Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-950"><ArrowLeft className="h-4 w-4" />Back to the edit</Link></div></header><main className="mx-auto grid max-w-5xl gap-10 px-5 py-12 lg:grid-cols-2 lg:py-20"><div className={`min-h-[360px] rounded-[2rem] bg-gradient-to-br ${product.accent} p-8 shadow-[0_24px_70px_rgba(40,31,20,0.12)]`}><div className="flex h-full flex-col justify-between"><Badge className="w-fit bg-white/70 text-stone-700">{product.category}</Badge><div><div className="mb-4 h-3 w-32 rounded-full bg-stone-900/15" /><div className="h-12 max-w-xs rounded-2xl bg-white/70" /></div></div></div><div className="flex flex-col justify-center"><Badge className={affiliate ? "w-fit bg-orange-100 text-orange-800" : "w-fit bg-emerald-100 text-emerald-800"}>{affiliate ? "Affiliate partner deal" : "Direct purchase"}</Badge><h1 className="mt-5 text-5xl font-semibold tracking-[-0.05em]">{product.name}</h1><p className="mt-4 text-lg leading-8 text-stone-600">{product.note}. This page explains who fulfills the order and how the destination is handled.</p><div className="mt-8 flex items-center justify-between border-y border-stone-200 py-5"><span className="text-sm text-stone-500">Current offer</span><span className="text-2xl font-semibold">{product.price}</span></div><div className="mt-8 space-y-3 text-sm text-stone-600"><div className="flex gap-3"><Check className="h-5 w-5 shrink-0 text-emerald-700" />Availability and destination checks run before publishing.</div><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" />Marketing claims are reviewed for safety and accuracy.</div><div className="flex gap-3"><Link2 className="h-5 w-5 shrink-0 text-orange-700" />{affiliate ? "Your click is transparently attributed to the partner offer." : "Checkout will remain on our store when payment is connected."}</div></div><Button size="lg" className={`mt-9 w-full ${affiliate ? "bg-stone-950 hover:bg-stone-800" : "bg-emerald-700 hover:bg-emerald-800"}`} onClick={action}>{affiliate ? <>View partner offer<ArrowUpRight className="ml-2 h-4 w-4" /></> : <>Continue to checkout<ShoppingBag className="ml-2 h-4 w-4" /></>}</Button>{affiliate && <p className="mt-4 text-xs leading-5 text-stone-500">Affiliate disclosure: We may earn a commission if you purchase through this partner link. The price you pay does not change.</p>}</div></main><footer className="border-t border-stone-200 px-5 py-8 text-center text-xs text-stone-500"><Link href="/trust" className="hover:text-stone-900">Trust center</Link> · <Link href="/privacy" className="hover:text-stone-900">Privacy</Link></footer></div>;
+}
