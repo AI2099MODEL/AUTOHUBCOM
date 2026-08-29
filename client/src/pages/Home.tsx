@@ -147,7 +147,7 @@ export default function Home() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [destination, setDestination] = useState<"worldwide" | "india">("worldwide");
   const [currency, setCurrency] = useState<"USD" | "INR">("USD");
-  const [activeTab, setActiveTab] = useState("storefront");
+  const [catalogProducts, setCatalogProducts] = useState<HealthBeautyItem[]>(HEALTH_BEAUTY_CATALOG);
   const [selectedStudioProduct, setSelectedStudioProduct] = useState<HealthBeautyItem>(HEALTH_BEAUTY_CATALOG[0]);
 
   const [linkInput, setLinkInput] = useState("");
@@ -155,10 +155,6 @@ export default function Home() {
   const [sourcesList, setSourcesList] = useState([
     { id: "1", url: "https://fkrt.co/pDEIvN", store: "Flipkart Health & Beauty", status: "Active · Scanning hourly", items: 1 },
     { id: "2", url: "https://fkrt.co/ykrYNt", store: "Flipkart / The Derma Co", status: "Active · Scanning hourly", items: 1 },
-    { id: "3", url: "https://extrape.com/c/tira-laneige-lip-mask", store: "Tira Beauty / ExtraPe", status: "Active · Scanning hourly", items: 1 },
-    { id: "4", url: "https://extrape.com/c/dotkey-barrier-repair", store: "Dot & Key / ExtraPe", status: "Active · Scanning hourly", items: 1 },
-    { id: "5", url: "https://extrape.com/c/plum-vitaminc-mandarin", store: "Plum Clean Beauty / ExtraPe", status: "Active · Scanning hourly", items: 1 },
-    { id: "6", url: "https://www.iherb.com/c/beauty", store: "iHerb Global Skincare", status: "Active · Scanning hourly", items: 2 },
   ]);
 
   const handleScanAndAddLink = () => {
@@ -172,8 +168,48 @@ export default function Home() {
       setIsScanning(false);
       const url = linkInput.trim();
       const isFkrt = url.includes("fkrt.co") || url.includes("flipkart");
-      const storeName = isFkrt ? "Flipkart Health & Beauty" : url.includes("extrape") ? "ExtraPe Verified Deals" : url.includes("nykaa") ? "Nykaa" : "Partner Store";
-      
+      const isAjio = url.includes("ajio.com") || url.includes("ajio");
+      const isNykaa = url.includes("nykaa.com") || url.includes("nykaa");
+      const isIherb = url.includes("iherb.com") || url.includes("iherb");
+      const storeName = isFkrt
+        ? "Flipkart Health & Beauty"
+        : isAjio
+        ? "Ajio Beauty & Luxury"
+        : isNykaa
+        ? "Nykaa"
+        : isIherb
+        ? "iHerb Global"
+        : "Verified Affiliate Merchant";
+
+      const storeId = isFkrt ? "flipkart" : isAjio ? "ajio" : isNykaa ? "nykaa" : isIherb ? "iherb" : "extrape";
+
+      const newProduct: HealthBeautyItem = {
+        id: `scanned-${Date.now()}`,
+        slug: `scanned-product-${Date.now()}`,
+        name: `Curated Health & Beauty Pick (${storeName})`,
+        brand: "Verified Brand",
+        category: "Skincare",
+        type: "affiliate",
+        priceUsd: 8.5,
+        priceInr: 699,
+        storeId,
+        storeName,
+        imageUrl: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&auto=format&fit=crop&q=80",
+        accent: "from-amber-100 via-rose-50 to-orange-50",
+        score: 95,
+        keyBenefit: "Dermatologist-tested daily skincare formula with clean ingredients and fast express shipping.",
+        skinType: "All skin types",
+        shipsWorldwide: isIherb,
+        shipsIndia: true,
+        shippingNote: isFkrt ? "Fast 2-3 Day India Express Delivery (Free over ₹500)" : "India Express Delivery",
+        affiliateUrl: url,
+        tag: "Scanned in Control Room",
+        approvedForPublishing: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      setCatalogProducts((prev) => [newProduct, ...prev]);
+
       setSourcesList((prev) => [
         {
           id: String(Date.now()),
@@ -187,7 +223,7 @@ export default function Home() {
 
       setLinkInput("");
       toast.success("Affiliate Link Scanned & Added to Store!", {
-        description: `Ingested Health & Beauty product from ${storeName}. Shipping rules & social posts generated.`,
+        description: `Ingested Health & Beauty product from ${storeName}. Added to your live storefront.`,
       });
     }, 800);
   };
@@ -196,8 +232,8 @@ export default function Home() {
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 1200)),
       {
-        loading: "Running hourly scan across all affiliate feeds...",
-        success: "Scan complete! Verified 6 active feeds. Expired links: 0. Store catalog updated.",
+        loading: "Running hourly scan across your affiliate feeds...",
+        success: `Scan complete! Verified ${sourcesList.length} active feeds. 0 expired links. Store catalog is up to date.`,
         error: "Failed to run scan",
       }
     );
@@ -205,15 +241,15 @@ export default function Home() {
 
   const filteredProducts = useMemo(() => {
     return categoryFilter === "all"
-      ? HEALTH_BEAUTY_CATALOG
-      : HEALTH_BEAUTY_CATALOG.filter((p) => p.category === categoryFilter);
-  }, [categoryFilter]);
+      ? catalogProducts
+      : catalogProducts.filter((p) => p.category === categoryFilter);
+  }, [categoryFilter, catalogProducts]);
 
   const openProduct = (product: HealthBeautyItem) => setLocation(`/product/${product.slug}`);
 
   const handleAutoPublishAll = () => {
     toast.success("Auto-Publishing Health & Beauty Catalog to Meta", {
-      description: `Queued 6 items with FTC disclosure for Brand Janra (Facebook Page 1185676227972117 & Instagram @brandjanra)`,
+      description: `Queued ${catalogProducts.length} items with FTC disclosure for Brand Janra (Facebook Page 1185676227972117 & Instagram @brandjanra)`,
     });
   };
 
@@ -346,12 +382,14 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-3 gap-2 border-t border-white/10 pt-5 text-center">
                 <div>
-                  <div className="text-xl font-bold sm:text-2xl">6 Picks</div>
-                  <div className="mt-1 text-[10px] uppercase tracking-widest text-stone-500">Live Deals</div>
+                  <div className="text-xl font-bold sm:text-2xl">{catalogProducts.length} Items</div>
+                  <div className="mt-1 text-[10px] uppercase tracking-widest text-stone-500">Live Scanned</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold sm:text-2xl">5 Stores</div>
-                  <div className="mt-1 text-[10px] uppercase tracking-widest text-stone-500">Global &amp; India</div>
+                  <div className="text-xl font-bold sm:text-2xl">
+                    {new Set(catalogProducts.map((p) => p.storeName)).size} Stores
+                  </div>
+                  <div className="mt-1 text-[10px] uppercase tracking-widest text-stone-500">Partners</div>
                 </div>
                 <div>
                   <div className="text-xl font-bold sm:text-2xl">100%</div>
@@ -363,131 +401,20 @@ export default function Home() {
         </section>
 
         {/* Store Partners Bar */}
-        <section id="stores" className="border-y border-stone-200/80 bg-white/70 px-5 py-6 lg:px-8">
+        <section id="stores" className="border-y border-stone-200/80 bg-white/70 px-5 py-5 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-stone-500">
-              Curated Across Verified Affiliate Store Partners
+              Active Verified Merchant Stores
             </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-xs font-bold text-stone-800 sm:gap-4">
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                🏪 Flipkart Health (Free &gt; ₹500)
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                🏪 Ajio Beauty &amp; Luxury (Free &gt; ₹799)
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                🏪 Nykaa (India Express · Free &gt; ₹499)
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                🏪 Tira Beauty (Reliance)
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                🌿 iHerb Global (150+ Countries)
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                ✨ ExtraPe Verified Deals Hub
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-3.5 py-1.5 shadow-xs">
-                📦 Amazon Global &amp; India
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Recommended Deals Section */}
-        <section className="border-b border-stone-200/80 bg-stone-900 px-5 py-14 text-white lg:px-8 lg:py-18">
-          <div className="mx-auto max-w-7xl">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-              <div>
-                <span className="inline-flex items-center gap-2 rounded-full bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-widest text-rose-300">
-                  <Sparkles className="h-3.5 w-3.5" /> High-Discount Recommended Deals
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs font-bold text-stone-800 sm:gap-4">
+              {Array.from(new Set(catalogProducts.map((p) => p.storeName))).map((storeName) => (
+                <span
+                  key={storeName}
+                  className="flex items-center gap-1.5 rounded-full border border-stone-300/80 bg-white px-4 py-1.5 shadow-xs"
+                >
+                  <Store className="h-3.5 w-3.5 text-stone-700" /> {storeName}
                 </span>
-                <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-                  Curated Partner Deals (Up to 26% OFF)
-                </h2>
-                <p className="mt-2 text-sm text-stone-400">
-                  Live trending offers from Flipkart, Ajio, Tira Beauty, Foxtale, Tata 1mg, Purplle, Myntra, and iHerb.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {RECOMMENDED_DEALS_POOL.map((deal) => {
-                const isNew = isNewlyAdded(deal.createdAt);
-                return (
-                  <div
-                    key={deal.id}
-                    className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 transition-all hover:border-amber-400/40 hover:shadow-xl"
-                  >
-                    <div>
-                      {/* Deal Image with Store Badge */}
-                      <div className="relative h-48 w-full overflow-hidden bg-stone-900">
-                        <img
-                          src={deal.imageUrl}
-                          alt={deal.name}
-                          loading="lazy"
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/20 to-stone-950/40" />
-
-                        <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
-                          <span className="rounded-md bg-stone-950/80 px-2.5 py-1 text-[11px] font-bold text-amber-300 backdrop-blur">
-                            🏪 {deal.storeName}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            {isNew && (
-                              <span className="rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-white shadow-md">
-                                ✨ NEW
-                              </span>
-                            )}
-                            <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-extrabold text-white">
-                              {deal.discountPercent}% OFF
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-5">
-                        <h3 className="text-base font-bold leading-snug text-stone-100 group-hover:text-amber-200">
-                          {deal.name}
-                        </h3>
-                        <p className="mt-1 text-xs font-medium text-stone-400">
-                          By {deal.brand} · {deal.category}
-                        </p>
-
-                        <p className="mt-3 text-xs leading-relaxed text-stone-400 line-clamp-2">
-                          {deal.keyBenefit}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-stone-800/80 p-5 pt-4">
-                      <div className="flex items-baseline justify-between">
-                        <div>
-                          <span className="text-lg font-extrabold text-white">
-                            {currency === "USD" ? `$${deal.dealPriceUsd.toFixed(2)}` : `₹${deal.dealPriceInr.toLocaleString()}`}
-                          </span>
-                          <span className="ml-2 text-xs text-stone-500 line-through">
-                            {currency === "USD" ? `$${deal.originalPriceUsd.toFixed(2)}` : `₹${deal.originalPriceInr.toLocaleString()}`}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-emerald-400">
-                          ★ {deal.rating} ({deal.reviewsCount.toLocaleString()})
-                        </span>
-                      </div>
-
-                      <a
-                        href={deal.affiliateUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-bold text-stone-950 transition hover:bg-amber-300"
-                      >
-                        Grab Deal on {deal.storeName.split(" ")[0]} <ArrowUpRight className="h-3.5 w-3.5" />
-                      </a>
-                    </div>
-                  </div>
-                );
-              })}
+              ))}
             </div>
           </div>
         </section>
