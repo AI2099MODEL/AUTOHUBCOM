@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTrackedPath, canPublishOffer, hasRequiredDisclosure, scoreOffer } from "../shared/commerce";
+import { createContentDraft } from "../shared/content";
 
 describe("commerce rules", () => {
   it("scores an offer from bounded signals", () => {
@@ -23,5 +24,14 @@ describe("commerce rules", () => {
 
   it("builds a transparent, attributable redirect path", () => {
     expect(buildTrackedPath("halo desk light", "instagram", "august-edit")).toBe("/go/halo%20desk%20light?src=instagram&campaign=august-edit");
+  });
+
+  it("creates distinct channel drafts with disclosures and tracking", () => {
+    const instagram = createContentDraft({ productName: "Halo Desk Light", category: "Workspace", reasonToConsider: "Its compact footprint keeps a small desk calmer.", productSlug: "halo-desk-light", source: "instagram", campaign: "august-edit", affiliate: true });
+    const youtube = createContentDraft({ productName: "Halo Desk Light", category: "Workspace", reasonToConsider: "Its compact footprint keeps a small desk calmer.", productSlug: "halo-desk-light", source: "youtube", campaign: "august-edit", affiliate: true });
+    expect(instagram.script).toContain("Hook");
+    expect(youtube.title).toContain("what to know");
+    expect(instagram.disclosure).toContain("commission");
+    expect(instagram.trackingUrl).toContain("src=instagram");
   });
 });
