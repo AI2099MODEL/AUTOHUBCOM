@@ -145,6 +145,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [storeFilter, setStoreFilter] = useState<string>("all");
   const [destination, setDestination] = useState<"worldwide" | "india">("worldwide");
   const [currency, setCurrency] = useState<"USD" | "INR">("USD");
   const [activeTab, setActiveTab] = useState("storefront");
@@ -406,11 +407,71 @@ export default function Home() {
     );
   };
 
+  const [isFetchingStore, setIsFetchingStore] = useState(false);
+
+  const handleFetchStoreCollection = async (slug: string, storeTitle: string) => {
+    setIsFetchingStore(true);
+    try {
+      const res = await fetch(`/api/fetchStore?slug=${slug}`);
+      const data = await res.json();
+      if (data && data.products && Array.isArray(data.products)) {
+        const mappedItems: HealthBeautyItem[] = data.products.map((item: any, idx: number) => {
+          const rawPrice = parseFloat(String(item.price || "499").replace(/[^0-9.]/g, "")) || 499;
+          const priceInr = rawPrice < 100 ? Math.round(rawPrice * 83) : Math.round(rawPrice);
+          const priceUsd = rawPrice < 100 ? rawPrice : Number((rawPrice / 83).toFixed(2));
+          const name = item.title || item.name || `${storeTitle} Curated Product`;
+
+          return {
+            id: `store-${slug}-${Date.now()}-${idx}`,
+            slug: `item-${slug}-${Date.now()}-${idx}`,
+            name,
+            brand: item.brand || storeTitle,
+            category: item.category || "Skincare",
+            type: "affiliate",
+            priceUsd,
+            priceInr,
+            storeId: data.storeId || slug.replace("ep-", ""),
+            storeName: data.storeName || storeTitle,
+            imageUrl: item.image || item.image_url || "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&auto=format&fit=crop&q=80",
+            accent: "from-amber-100 via-rose-50 to-orange-50",
+            score: 96,
+            keyBenefit: item.description || `Authentic ${storeTitle} skincare product with verified affiliate rewards.`,
+            skinType: "All skin types",
+            shipsWorldwide: slug === "ep-iherb",
+            shipsIndia: true,
+            shippingNote: "Express Shipping",
+            affiliateUrl: item.link || item.affiliate_link || `https://www.extrape.com/store-details/${slug}`,
+            tag: `ExtraPe: ${storeTitle}`,
+            approvedForPublishing: true,
+            createdAt: new Date().toISOString(),
+          };
+        });
+
+        const updated = [...mappedItems, ...catalogProducts.filter((p) => p.storeId !== data.storeId)];
+        setCatalogProducts(updated);
+        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(updated));
+        setStoreFilter(data.storeId || slug.replace("ep-", ""));
+        toast.success(`Fetched & Loaded ${mappedItems.length} Products from ${storeTitle}!`, {
+          description: `Storefront is now displaying ${storeTitle} products.`,
+        });
+      }
+    } catch (e: any) {
+      toast.error(`Could not fetch store ${storeTitle}`);
+    } finally {
+      setIsFetchingStore(false);
+    }
+  };
+
   const filteredProducts = useMemo(() => {
-    return categoryFilter === "all"
-      ? catalogProducts
-      : catalogProducts.filter((p) => p.category === categoryFilter);
-  }, [categoryFilter, catalogProducts]);
+    return catalogProducts.filter((p) => {
+      const matchCat = categoryFilter === "all" || p.category === categoryFilter;
+      const matchStore =
+        storeFilter === "all" ||
+        p.storeId?.toLowerCase() === storeFilter.toLowerCase() ||
+        p.storeName?.toLowerCase().includes(storeFilter.toLowerCase());
+      return matchCat && matchStore;
+    });
+  }, [categoryFilter, storeFilter, catalogProducts]);
 
   const openProduct = (product: HealthBeautyItem) => setLocation(`/product/${product.slug}`);
 
@@ -603,19 +664,49 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Category Filter */}
-              <div className="flex flex-wrap gap-2">
-                {["all", "Skincare", "Hair Care", "Wellness & Supplements"].map((cat) => (
-                  <Button
-                    key={cat}
-                    size="sm"
-                    variant={categoryFilter === cat ? "default" : "outline"}
-                    className={categoryFilter === cat ? "bg-stone-950 text-white" : "border-stone-300 bg-transparent text-stone-700"}
-                    onClick={() => setCategoryFilter(cat)}
-                  >
-                    {cat === "all" ? "All categories" : cat}
-                  </Button>
-                ))}
+              {/* Category & Store Filters */}
+              <div className="space-y-2.5">
+                {/* Category Filter */}
+                <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                  {["all", "Skincare", "Hair Care", "Wellness & Supplements", "Clean Beauty"].map((cat) => (
+                    <Button
+                      key={cat}
+                      size="sm"
+                      variant={categoryFilter === cat ? "default" : "outline"}
+                      className={categoryFilter === cat ? "bg-stone-950 text-white text-xs" : "border-stone-300 bg-white/70 text-stone-700 text-xs"}
+                      onClick={() => setCategoryFilter(cat)}
+                    >
+                      {cat === "all" ? "All Categories" : cat}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Store Quick Switcher Bar */}
+                <div className="flex flex-wrap gap-1.5 sm:justify-end items-center">
+                  <span className="text-[11px] font-bold text-stone-500 mr-1">Store:</span>
+                  {[
+                    { id: "all", label: "All Stores" },
+                    { id: "dotandkey", label: "Dot & Key" },
+                    { id: "nykaa", label: "Nykaa" },
+                    { id: "shopsy", label: "Shopsy" },
+                    { id: "ajio", label: "Ajio" },
+                    { id: "plum", label: "Plum" },
+                    { id: "flipkart", label: "Flipkart" },
+                    { id: "iherb", label: "iHerb" },
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      onClick={() => setStoreFilter(st.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                        storeFilter === st.id
+                          ? "bg-amber-800 text-white shadow-xs"
+                          : "bg-white/80 border border-stone-200 text-stone-700 hover:bg-stone-100"
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -931,6 +1022,44 @@ export default function Home() {
                       >
                         {isImportingJson ? "Importing..." : "🚀 Import JSON Feed to Store"}
                       </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 1-Click Multi-Store ExtraPe Fetcher */}
+                <Card className="border-stone-300 shadow-sm bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900 text-white">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base font-bold text-amber-200">🏬 1-Click Store Deals Importer</CardTitle>
+                        <p className="mt-1 text-xs text-stone-400">
+                          Fetch authentic collections directly by store slug (<code className="text-amber-300 font-mono">/api/fetchStore?slug=...</code>)
+                        </p>
+                      </div>
+                      <Badge className="bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30">Auto Store Sync</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {[
+                        { slug: "ep-dotandkey", name: "Dot & Key", icon: "🍉", desc: "Cooling Sunscreens & Moisturizers" },
+                        { slug: "ep-nykaa", name: "Nykaa Beauty", icon: "💄", desc: "Cosmetics & Bestseller Serums" },
+                        { slug: "ep-shopsy", name: "Shopsy Flipkart", icon: "🛒", desc: "Budget Health & Beauty Finds" },
+                        { slug: "ep-ajio", name: "Ajio Beauty", icon: "👗", desc: "Luxury Ayurvedic & Fragrances" },
+                        { slug: "ep-plum", name: "Plum Goodness", icon: "🌿", desc: "Clean & Vegan Skincare" },
+                      ].map((store) => (
+                        <button
+                          key={store.slug}
+                          disabled={isFetchingStore}
+                          onClick={() => handleFetchStoreCollection(store.slug, store.name)}
+                          className="flex flex-col items-start p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/15 text-left transition hover:border-amber-400/50 group"
+                        >
+                          <span className="text-xl mb-1">{store.icon}</span>
+                          <span className="text-xs font-bold text-white group-hover:text-amber-300">{store.name}</span>
+                          <span className="text-[10px] text-stone-400 mt-0.5 line-clamp-1">{store.desc}</span>
+                          <span className="mt-2 text-[10px] font-bold text-amber-300 uppercase tracking-wider">⚡ Fetch Deals &rarr;</span>
+                        </button>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
