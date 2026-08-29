@@ -1,9 +1,11 @@
 import { eq, sql } from "drizzle-orm";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, User, attributionEvents, contentPackages, products, users, trackedLinks, socialConnections } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+function encryptSecret(value?: string) { if (!value) return value; const key = createHash("sha256").update(process.env.JWT_SECRET || "brandjanra-token-key").digest(); const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return `v1:${iv.toString("base64url")}:${cipher.getAuthTag().toString("base64url")}:${encrypted.toString("base64url")}`; }
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -73,8 +75,9 @@ export async function markTrackedLinkCheck(id: number, ok: boolean, error?: stri
 export async function saveSocialConnection(input: { platform: "meta" | "youtube"; accountId: string; accountName?: string; accessToken: string; refreshToken?: string; tokenExpiresAt?: Date; scopes?: string }) {
   const db = await getDb(); if (!db) return undefined;
   const existing = await db.select().from(socialConnections).where(eq(socialConnections.accountId, input.accountId)).limit(1);
-  if (existing[0]) { await db.update(socialConnections).set({ ...input, status: "connected" }).where(eq(socialConnections.id, existing[0].id)); return existing[0].id; }
-  const result = await db.insert(socialConnections).values({ ...input, status: "connected" }); return result[0]?.insertId;
+  const safeInput = { ...input, accessToken: encryptSecret(input.accessToken)!, refreshToken: encryptSecret(input.refreshToken) };
+  if (existing[0]) { await db.update(socialConnections).set({ ...safeInput, status: "connected" }).where(eq(socialConnections.id, existing[0].id)); return existing[0].id; }
+  const result = await db.insert(socialConnections).values({ ...safeInput, status: "connected" }); return result[0]?.insertId;
 }
 
 export async function getSocialConnections() {
