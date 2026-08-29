@@ -280,6 +280,104 @@ export default function Home() {
     }, 400);
   };
 
+  const [jsonFeedInput, setJsonFeedInput] = useState("");
+  const [isImportingJson, setIsImportingJson] = useState(false);
+
+  const handleImportJsonFeed = () => {
+    if (!jsonFeedInput.trim()) {
+      toast.error("Please paste a JSON product array or feed");
+      return;
+    }
+
+    try {
+      let parsed = JSON.parse(jsonFeedInput.trim());
+      let itemsArray = Array.isArray(parsed) ? parsed : (parsed.products || parsed.items || []);
+
+      if (!Array.isArray(itemsArray) || itemsArray.length === 0) {
+        toast.error("Could not find a valid products array in the JSON");
+        return;
+      }
+
+      setIsImportingJson(true);
+      const newItems: HealthBeautyItem[] = itemsArray.map((item: any, idx: number) => {
+        const rawPrice = parseFloat(String(item.price || "15").replace(/[^0-9.]/g, "")) || 15;
+        // If price is < 100, treat as USD, otherwise INR
+        const priceUsd = rawPrice < 100 ? rawPrice : Number((rawPrice / 83).toFixed(2));
+        const priceInr = rawPrice < 100 ? Math.round(rawPrice * 83) : Math.round(rawPrice);
+        const name = item.title || item.name || `ExtraPe Product ${idx + 1}`;
+        const url = item.link || item.url || item.affiliateUrl || "https://extp.in/";
+        const isFkrt = url.includes("fkrt.co") || url.includes("flipkart");
+        const isAjio = url.includes("ajio.com") || url.includes("ajio");
+        const isNykaa = url.includes("nykaa.com") || url.includes("nykaa");
+        const isIherb = url.includes("iherb.com") || url.includes("iherb");
+        const storeName = isFkrt ? "Flipkart" : isAjio ? "Ajio" : isNykaa ? "Nykaa" : isIherb ? "iHerb" : "ExtraPe Verified";
+        const storeId = isFkrt ? "flipkart" : isAjio ? "ajio" : isNykaa ? "nykaa" : isIherb ? "iherb" : "extrape";
+
+        return {
+          id: `feed-${Date.now()}-${idx}`,
+          slug: `item-${Date.now()}-${idx}`,
+          name,
+          brand: item.brand || name.split(" ")[0] || "Verified Brand",
+          category: item.category || "Skincare",
+          type: "affiliate",
+          priceUsd,
+          priceInr,
+          storeId,
+          storeName,
+          imageUrl: item.image || item.imageUrl || "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&auto=format&fit=crop&q=80",
+          accent: "from-amber-100 via-rose-50 to-orange-50",
+          score: 95,
+          keyBenefit: item.description || "Dermatologist-tested skincare formula with verified affiliate links.",
+          skinType: "All skin types",
+          shipsWorldwide: storeId === "iherb",
+          shipsIndia: true,
+          shippingNote: "Express Shipping",
+          affiliateUrl: url,
+          tag: "ExtraPe JSON Feed",
+          approvedForPublishing: true,
+          createdAt: new Date().toISOString(),
+        };
+      });
+
+      const updatedProducts = [...newItems, ...catalogProducts];
+      setCatalogProducts(updatedProducts);
+      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(updatedProducts));
+      setJsonFeedInput("");
+      setIsImportingJson(false);
+      toast.success(`Imported ${newItems.length} Products from ExtraPe JSON Feed!`, {
+        description: "All items are now live and published on your storefront.",
+      });
+    } catch (e: any) {
+      setIsImportingJson(false);
+      toast.error("Invalid JSON syntax. Please check the JSON format.");
+    }
+  };
+
+  const handleLoadExtraPeSample = () => {
+    const sample = [
+      {
+        title: "COSRX Advanced Snail 96 Mucin Essence (100ml)",
+        price: "19.00",
+        description: "Deep barrier repair & hydration",
+        image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&auto=format&fit=crop&q=80",
+        link: "https://extp.in/1wlOQq",
+        brand: "COSRX",
+        category: "Skincare"
+      },
+      {
+        title: "The Ordinary Niacinamide 10% + Zinc 1% (30ml)",
+        price: "6.50",
+        description: "Minimizes pores, regulates sebum",
+        image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&auto=format&fit=crop&q=80",
+        link: "https://extp.in/xyz123",
+        brand: "The Ordinary",
+        category: "Skincare"
+      }
+    ];
+    setJsonFeedInput(JSON.stringify(sample, null, 2));
+    toast.info("Loaded ExtraPe sample JSON feed into importer");
+  };
+
   const handleDeleteProduct = (productId: string) => {
     const updated = catalogProducts.filter((p) => p.id !== productId);
     setCatalogProducts(updated);
@@ -791,6 +889,49 @@ export default function Home() {
                         {isScanning ? "Processing Link..." : "🚀 Ingest & Publish Product to Store"}
                       </Button>
                     </form>
+                  </CardContent>
+                </Card>
+
+                {/* ExtraPe / Bulk JSON Feed Importer */}
+                <Card className="border-stone-300 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base font-bold">📋 ExtraPe / Bulk JSON Feed Importer</CardTitle>
+                        <p className="mt-1 text-xs text-stone-500">
+                          Paste your ExtraPe products array or JSON feed (no API key needed).
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleLoadExtraPeSample}
+                        className="text-xs border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 font-bold"
+                      >
+                        ⚡ Load Sample Feed
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <textarea
+                      rows={6}
+                      placeholder={`[\n  {\n    "title": "COSRX Advanced Snail 96 Mucin Essence",\n    "price": "19.00",\n    "description": "Deep barrier repair & hydration",\n    "image": "https://example.com/cosrx.jpg",\n    "link": "https://extp.in/1wlOQq"\n  }\n]`}
+                      value={jsonFeedInput}
+                      onChange={(e) => setJsonFeedInput(e.target.value)}
+                      className="w-full rounded-xl border border-stone-300 bg-white p-3 font-mono text-[11px] text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900"
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-stone-500">
+                        Endpoint active: <code className="bg-stone-200/70 px-1.5 py-0.5 rounded text-[10px] text-stone-800">/api/products</code>
+                      </span>
+                      <Button
+                        onClick={handleImportJsonFeed}
+                        disabled={isImportingJson}
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4"
+                      >
+                        {isImportingJson ? "Importing..." : "🚀 Import JSON Feed to Store"}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
 
