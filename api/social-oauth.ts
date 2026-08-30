@@ -1,9 +1,31 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { saveSocialConnection } from "../server/db";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
+import { Pool } from "pg";
 
 const appUrl = process.env.PUBLIC_APP_URL || "https://brandjanra.vercel.app";
 const redirectUri = `${appUrl}/api/social-oauth`;
+const databaseUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.SUPABASE_DB_URL || "";
+const postgresUrl = (raw: string) => { try { const url = new URL(raw); ["sslmode", "sslcert", "sslkey", "sslrootcert"].forEach((key) => url.searchParams.delete(key)); return url.toString(); } catch { return raw; } };
+const encryptSecret = (value?: string) => { if (!value) return value; const key = createHash("sha256").update(process.env.JWT_SECRET || "brandjanra-token-key").digest(); const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return `v1:${iv.toString("base64url")}:${cipher.getAuthTag().toString("base64url")}:${encrypted.toString("base64url")}`; };
+
+async function saveSocialConnection(input: { platform: "meta" | "youtube"; accountId: string; accountName: string; accessToken: string; refreshToken?: string; tokenExpiresAt?: Date; scopes: string }) {
+  const rawUrl = databaseUrl();
+  if (!rawUrl) throw new Error("No Vercel/Supabase PostgreSQL URL is configured.");
+  const pool = new Pool({ connectionString: postgresUrl(rawUrl), ssl: { rejectUnauthorized: false }, max: 1 });
+  try {
+    const existing = await pool.query<{ id: number }>('SELECT "id" FROM "social_connections" WHERE "accountId" = $1 LIMIT 1', [input.accountId]);
+    const values = [input.platform, input.accountId, input.accountName, encryptSecret(input.accessToken), encryptSecret(input.refreshToken) || null, input.tokenExpiresAt || null, input.scopes];
+    if (existing.rows[0]) {
+      await pool.query('UPDATE "social_connections" SET "platform"=$1,"accountName"=$2,"accessToken"=$3,"refreshToken"=$4,"tokenExpiresAt"=$5,"scopes"=$6,"status"=\'connected\',"updatedAt"=NOW() WHERE "id"=$7', [...values, existing.rows[0].id]);
+      return existing.rows[0].id;
+    }
+    const result = await pool.query<{ id: number }>('INSERT INTO "social_connections" ("platform","accountId","accountName","accessToken","refreshToken","tokenExpiresAt","scopes","status") VALUES ($1,$2,$3,$4,$5,$6,$7,\'connected\') RETURNING "id"', values);
+    return result.rows[0]?.id;
+  } finally { await pool.end(); }
+}
+
 function error(res: VercelResponse, message: string) { return res.status(400).send(`<h1>Social connection failed</h1><p>${message}</p><p>Return to Brand Janra Control Room.</p>`); }
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const provider = String(req.query.provider || "");
   const action = String(req.query.action || "start");
