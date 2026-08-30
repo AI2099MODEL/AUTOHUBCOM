@@ -8,11 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
-const demoProducts = [
-  { name: "Barrier Repair Serum", brand: "Dermatologica", category: "Skincare", price: "$28.00", image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=900&auto=format&fit=crop&q=85", tag: "Editors’ pick", detail: "Ceramide-rich hydration for a calmer, stronger barrier.", clickUrl: "" },
-  { name: "Scalp Renewal Treatment", brand: "Kérastase", category: "Hair care", price: "$42.00", image: "https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=900&auto=format&fit=crop&q=85", tag: "Trending", detail: "A lightweight daily ritual for refreshed, healthy-looking hair.", clickUrl: "" },
-  { name: "Daily Adaptogen Blend", brand: "Ritual Lab", category: "Wellness", price: "$34.00", image: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=900&auto=format&fit=crop&q=85", tag: "New", detail: "A simple botanical blend to support an intentional daily routine.", clickUrl: "" },
-];
+const demoProducts: any[] = [];
 
 export default function Home() {
   const [controlRoomOpen, setControlRoomOpen] = useState(false);
