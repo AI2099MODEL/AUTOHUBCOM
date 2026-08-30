@@ -6,7 +6,7 @@ The latest Brand Janra source has been synchronized into the Manus-managed proje
 
 **Automatic sync status:** CJ automatic product sync is **not enabled yet**. The endpoint and Control Room status are present, but production CJ credentials and a successful scheduled run are still required. The link-expiry checker is scheduled separately and is registered as `brandjanra-link-expiry-check`.
 
-**Database status:** The application source and Vercel serverless functions now use PostgreSQL (`pg`) and quoted PostgreSQL identifiers. The initial PostgreSQL migration is generated. The current Manus shell still exposes the legacy local database environment, so the migration must be run from the deployment environment after confirming that Vercel `DATABASE_URL` points to the Supabase Transaction Pooler.
+**Database status:** The application source and Vercel serverless functions now use PostgreSQL (`pg`) and quoted PostgreSQL identifiers. The initial PostgreSQL migration is generated. Vercel now has the Supabase integration variables `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, and `POSTGRES_URL_NON_POOLING` in Production; the next deployment will consume them. The Supabase schema migration still must be applied before product persistence can succeed.
 
 **Social profile URLs supplied by the owner:** Facebook: https://www.facebook.com/profile.php?id=61593884283083; Instagram: https://www.instagram.com/brandjanra/; YouTube: https://www.youtube.com/channel/UCb_Bm4zZrEjTDmG7uU-eV2Q. These are public profile destinations, not OAuth credentials; official OAuth connections remain required before publishing.
 
