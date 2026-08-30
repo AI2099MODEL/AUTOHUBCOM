@@ -1,12 +1,15 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createCipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Pool } from "pg";
 
 const appUrl = process.env.PUBLIC_APP_URL || "https://brandjanra.vercel.app";
 const redirectUri = `${appUrl}/api/social-oauth`;
 const databaseUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.SUPABASE_DB_URL || "";
 const postgresUrl = (raw: string) => { try { const url = new URL(raw); ["sslmode", "sslcert", "sslkey", "sslrootcert"].forEach((key) => url.searchParams.delete(key)); return url.toString(); } catch { return raw; } };
-const encryptSecret = (value?: string) => { if (!value) return value; const key = createHash("sha256").update(process.env.JWT_SECRET || "brandjanra-token-key").digest(); const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return `v1:${iv.toString("base64url")}:${cipher.getAuthTag().toString("base64url")}:${encrypted.toString("base64url")}`; };
+const oauthSecret = () => process.env.JWT_SECRET || "brandjanra-token-key";
+const encryptSecret = (value?: string) => { if (!value) return value; const key = createHash("sha256").update(oauthSecret()).digest(); const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return `v1:${iv.toString("base64url")}:${cipher.getAuthTag().toString("base64url")}:${encrypted.toString("base64url")}`; };
+const createOAuthState = (provider: "meta" | "youtube") => { const payload = Buffer.from(JSON.stringify({ provider, createdAt: Date.now(), nonce: randomBytes(16).toString("base64url") })).toString("base64url"); const signature = createHmac("sha256", oauthSecret()).update(payload).digest("base64url"); return `${payload}.${signature}`; };
+const readOAuthState = (state: string) => { const [payload, signature] = state.split("."); if (!payload || !signature) return null; const expected = createHmac("sha256", oauthSecret()).update(payload).digest(); const actual = Buffer.from(signature, "base64url"); if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null; try { const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { provider?: string; createdAt?: number }; if (!["meta", "youtube"].includes(parsed.provider || "") || !parsed.createdAt || Date.now() - parsed.createdAt > 10 * 60 * 1000 || parsed.createdAt - Date.now() > 60 * 1000) return null; return parsed; } catch { return null; } };
 
 async function saveSocialConnection(input: { platform: "meta" | "youtube"; accountId: string; accountName: string; accessToken: string; refreshToken?: string; tokenExpiresAt?: Date; scopes: string }) {
   const rawUrl = databaseUrl();
@@ -32,8 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = req.query.action ? String(req.query.action) : (req.query.code || req.query.state ? "callback" : "start");
   if (action !== "start" && !provider) {
     try {
-      const statePayload = JSON.parse(Buffer.from(String(req.query.state || ""), "base64url").toString("utf8")) as { provider?: string };
-      provider = statePayload.provider || "";
+      const statePayload = readOAuthState(String(req.query.state || ""));
+      provider = statePayload?.provider || "";
     } catch {
       provider = "";
     }
@@ -47,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (action === "start") {
     if (provider === "meta" && (!process.env.META_APP_ID || !process.env.META_APP_SECRET)) return error(res, "Meta OAuth is not configured. Add META_APP_ID and META_APP_SECRET to the deployment.");
     if (provider === "youtube" && (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET)) return error(res, "YouTube OAuth is not configured. Add YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET to the deployment.");
-    const state = Buffer.from(JSON.stringify({ provider, createdAt: Date.now() })).toString("base64url");
+    const state = createOAuthState(provider);
     res.setHeader("Set-Cookie", `janra_oauth_state=${state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
     if (provider === "meta") {
       const params = new URLSearchParams({ client_id: process.env.META_APP_ID || "", redirect_uri: redirectUri, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish" });
@@ -57,8 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   }
   const code = String(req.query.code || ""); if (!code) return error(res, "OAuth provider did not return an authorization code.");
-  const returnedState = String(req.query.state || ""); const cookieHeader = String(req.headers.cookie || ""); const cookieState = cookieHeader.match(/(?:^|;\s*)janra_oauth_state=([^;]+)/)?.[1] || "";
-  if (!returnedState || returnedState !== cookieState) return error(res, "OAuth state validation failed. Restart the connection from the Control Room.");
+  const returnedState = String(req.query.state || "");
+  if (!readOAuthState(returnedState)) return error(res, "OAuth state validation failed or expired. Restart the connection from the Control Room.");
   try {
     if (provider === "meta") {
       const tokenResponse = await fetch("https://graph.facebook.com/v22.0/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: process.env.META_APP_ID || "", client_secret: process.env.META_APP_SECRET || "", redirect_uri: redirectUri, code }) });
