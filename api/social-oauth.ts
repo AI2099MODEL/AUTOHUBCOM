@@ -28,7 +28,7 @@ function error(res: VercelResponse, message: string) { return res.status(400).se
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   let provider = String(req.query.provider || "");
-  const action = String(req.query.action || "start");
+  const action = req.query.action ? String(req.query.action) : (req.query.code || req.query.state ? "callback" : "start");
   if (action !== "start" && !provider) {
     try {
       const statePayload = JSON.parse(Buffer.from(String(req.query.state || ""), "base64url").toString("utf8")) as { provider?: string };
