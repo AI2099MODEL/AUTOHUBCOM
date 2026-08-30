@@ -1,6 +1,10 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
+  "crons": [
+    { "path": "/api/scheduled/cj-sync", "schedule": "0 2 * * *" },
+    { "path": "/api/scheduled/check-links", "schedule": "0 3 * * *" }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",

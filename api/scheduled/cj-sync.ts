@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Use POST." });
+  if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false, message: "Use GET or POST." });
   const expected = process.env.CRON_SECRET; if (expected && String(req.headers.authorization || "") !== `Bearer ${expected}`) return res.status(401).json({ ok: false, message: "Unauthorized." });
   const apiToken = process.env.CJ_API_TOKEN; const pid = process.env.CJ_PID; const companyId = process.env.CJ_COMPANY_ID || "";
   if (!apiToken || !pid) return res.status(503).json({ ok: false, message: "CJ automatic sync is not configured. Add CJ_API_TOKEN and CJ_PID to the production deployment." });
