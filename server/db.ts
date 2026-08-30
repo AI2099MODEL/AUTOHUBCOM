@@ -91,5 +91,10 @@ export async function saveSocialConnection(input: { platform: "meta" | "youtube"
 
 export async function getSocialConnections() {
   const db = await getDb(); if (!db) return [];
-  return db.select({ id: socialConnections.id, platform: socialConnections.platform, accountId: socialConnections.accountId, accountName: socialConnections.accountName, tokenExpiresAt: socialConnections.tokenExpiresAt, scopes: socialConnections.scopes, status: socialConnections.status, updatedAt: socialConnections.updatedAt }).from(socialConnections).orderBy(sql`${socialConnections.updatedAt} desc`);
+  try {
+    return await db.select({ id: socialConnections.id, platform: socialConnections.platform, accountId: socialConnections.accountId, accountName: socialConnections.accountName, tokenExpiresAt: socialConnections.tokenExpiresAt, scopes: socialConnections.scopes, status: socialConnections.status, updatedAt: socialConnections.updatedAt }).from(socialConnections).orderBy(sql`${socialConnections.updatedAt} desc`);
+  } catch (error) {
+    console.warn("[Database] Social connections unavailable; returning an empty connection list.", error);
+    return [];
+  }
 }
