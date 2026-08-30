@@ -10,14 +10,14 @@ let _pool: Pool | null = null;
 function encryptSecret(value?: string) { if (!value) return value; const key = createHash("sha256").update(process.env.JWT_SECRET || "brandjanra-token-key").digest(); const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return `v1:${iv.toString("base64url")}:${cipher.getAuthTag().toString("base64url")}:${encrypted.toString("base64url")}`; }
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && ENV.databaseUrl) {
     try {
-      const protocol = new URL(process.env.DATABASE_URL).protocol;
+      const protocol = new URL(ENV.databaseUrl).protocol;
       if (protocol !== "postgres:" && protocol !== "postgresql:") {
         console.warn("[Database] PostgreSQL driver requires a postgres:// DATABASE_URL; skipping legacy database URL.");
         return null;
       }
-      _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+      _pool = new Pool({ connectionString: ENV.databaseUrl, ssl: { rejectUnauthorized: false } });
       _db = drizzle(_pool); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
   }
   return _db;
