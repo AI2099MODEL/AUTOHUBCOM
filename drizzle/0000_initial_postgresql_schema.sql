@@ -1,3 +1,35 @@
+DO $$ BEGIN CREATE TYPE "role" AS ENUM ('user', 'admin'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "productType" AS ENUM ('affiliate', 'direct'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "sourceType" AS ENUM ('affiliate', 'supplier'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "status" AS ENUM ('draft', 'active', 'paused'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "availabilityStatus" AS ENUM ('unknown', 'in_stock', 'out_of_stock'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "claimSafetyStatus" AS ENUM ('needs_review', 'approved', 'blocked'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "linkStatus" AS ENUM ('active', 'expired', 'paused', 'needs_review'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "platform" AS ENUM ('meta', 'youtube'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "socialStatus" AS ENUM ('connected', 'expired', 'revoked', 'needs_review'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "contentPlatform" AS ENUM ('instagram', 'facebook', 'youtube'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "contentStatus" AS ENUM ('draft', 'approved', 'scheduled', 'published', 'blocked'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "integrationStatus" AS ENUM ('not_connected', 'connected', 'blocked', 'manual_fallback'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "publishingStatus" AS ENUM ('queued', 'running', 'published', 'failed', 'paused'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "eventType" AS ENUM ('click', 'outbound', 'order', 'revenue'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "orderStatus" AS ENUM ('pending', 'paid', 'fulfilled', 'cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
+DO $$ BEGIN CREATE TYPE "socialPlatform" AS ENUM ('meta', 'youtube'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+--> statement-breakpoint
 CREATE TABLE "attribution_events" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"productId" integer NOT NULL,
