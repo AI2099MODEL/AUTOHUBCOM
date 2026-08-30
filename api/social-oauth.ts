@@ -27,9 +27,17 @@ async function saveSocialConnection(input: { platform: "meta" | "youtube"; accou
 function error(res: VercelResponse, message: string) { return res.status(400).send(`<h1>Social connection failed</h1><p>${message}</p><p>Return to Brand Janra Control Room.</p>`); }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const provider = String(req.query.provider || "");
+  let provider = String(req.query.provider || "");
   const action = String(req.query.action || "start");
-  if (!["meta", "youtube"].includes(provider)) return error(res, "Unknown social provider.");
+  if (action !== "start" && !provider) {
+    try {
+      const statePayload = JSON.parse(Buffer.from(String(req.query.state || ""), "base64url").toString("utf8")) as { provider?: string };
+      provider = statePayload.provider || "";
+    } catch {
+      provider = "";
+    }
+  }
+  if (!["meta", "youtube"].includes(provider)) return error(res, "Unknown social provider. Restart the connection from the Control Room.");
   if (action === "start") {
     if (provider === "meta" && (!process.env.META_APP_ID || !process.env.META_APP_SECRET)) return error(res, "Meta OAuth is not configured. Add META_APP_ID and META_APP_SECRET to the deployment.");
     if (provider === "youtube" && (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET)) return error(res, "YouTube OAuth is not configured. Add YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET to the deployment.");
