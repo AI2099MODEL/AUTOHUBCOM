@@ -24,7 +24,8 @@ async function saveSocialConnection(input: { platform: "meta" | "youtube"; accou
   } finally { await pool.end(); }
 }
 
-function error(res: VercelResponse, message: string) { return res.status(400).send(`<h1>Social connection failed</h1><p>${message}</p><p>Return to Brand Janra Control Room.</p>`); }
+function escapeHtml(value: string) { return value.replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;", "'": "&#39;" })[character] || character); }
+function error(res: VercelResponse, message: string) { return res.status(400).send(`<h1>Social connection failed</h1><p>${escapeHtml(message)}</p><p>Return to Brand Janra Control Room.</p>`); }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   let provider = String(req.query.provider || "");
@@ -38,6 +39,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
   if (!["meta", "youtube"].includes(provider)) return error(res, "Unknown social provider. Restart the connection from the Control Room.");
+  if (action !== "start" && req.query.error) {
+    const providerError = String(req.query.error);
+    const description = req.query.error_description ? `: ${String(req.query.error_description)}` : "";
+    return error(res, `OAuth provider returned ${providerError}${description}`);
+  }
   if (action === "start") {
     if (provider === "meta" && (!process.env.META_APP_ID || !process.env.META_APP_SECRET)) return error(res, "Meta OAuth is not configured. Add META_APP_ID and META_APP_SECRET to the deployment.");
     if (provider === "youtube" && (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET)) return error(res, "YouTube OAuth is not configured. Add YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET to the deployment.");
@@ -60,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await saveSocialConnection({ platform: "meta", accountId: "meta-business", accountName: "Meta Business Suite", accessToken: token.access_token, scopes: "pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish" });
     } else {
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: process.env.YOUTUBE_CLIENT_ID || "", client_secret: process.env.YOUTUBE_CLIENT_SECRET || "", redirect_uri: redirectUri, grant_type: "authorization_code", code }) });
-      const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string }; if (!token.access_token) return error(res, token.error || "YouTube did not return an access token.");
+      const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string; error_description?: string }; if (!token.access_token) return error(res, token.error_description || token.error || "YouTube did not return an access token.");
       await saveSocialConnection({ platform: "youtube", accountId: "youtube-channel", accountName: "YouTube Studio", accessToken: token.access_token, refreshToken: token.refresh_token, tokenExpiresAt: token.expires_in ? new Date(Date.now() + token.expires_in * 1000) : undefined, scopes: "youtube.upload,youtube.readonly" });
     }
     return res.redirect(`${appUrl}/?social=${provider}&connected=1`);
