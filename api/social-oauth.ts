@@ -16,7 +16,7 @@ async function saveSocialConnection(input: { platform: "meta" | "youtube"; accou
     const existing = await pool.query<{ id: number }>('SELECT "id" FROM "social_connections" WHERE "accountId" = $1 LIMIT 1', [input.accountId]);
     const values = [input.platform, input.accountId, input.accountName, encryptSecret(input.accessToken), encryptSecret(input.refreshToken) || null, input.tokenExpiresAt || null, input.scopes];
     if (existing.rows[0]) {
-      await pool.query('UPDATE "social_connections" SET "platform"=$1,"accountName"=$2,"accessToken"=$3,"refreshToken"=$4,"tokenExpiresAt"=$5,"scopes"=$6,"status"=\'connected\',"updatedAt"=NOW() WHERE "id"=$7', [...values, existing.rows[0].id]);
+      await pool.query('UPDATE "social_connections" SET "platform"=$1,"accountName"=$2,"accessToken"=$3,"refreshToken"=$4,"tokenExpiresAt"=$5,"scopes"=$6,"status"=\'connected\',"updatedAt"=NOW() WHERE "id"=$8', [...values, existing.rows[0].id]);
       return existing.rows[0].id;
     }
     const result = await pool.query<{ id: number }>('INSERT INTO "social_connections" ("platform","accountId","accountName","accessToken","refreshToken","tokenExpiresAt","scopes","status") VALUES ($1,$2,$3,$4,$5,$6,$7,\'connected\') RETURNING "id"', values);
