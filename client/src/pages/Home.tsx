@@ -80,7 +80,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#f6f3ed] text-stone-950">
       <header className="sticky top-0 z-20 border-b border-stone-200/80 bg-[#f6f3ed]/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-10">
-          <div className="flex items-center gap-3"><img src="/logo.png" alt="Janra" className="h-11 w-11 rounded-full object-cover shadow-sm" /><div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-stone-500">Global health & beauty</p><h1 className="font-display text-2xl font-semibold tracking-tight">Brand Janra</h1></div></div>
+          <div className="flex items-center gap-3"><img src="/manus-storage/Logo_294c6d62.png" alt="Janra" className="h-11 w-11 rounded-full object-cover shadow-sm" /><div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-stone-500">Global health & beauty</p><h1 className="font-display text-2xl font-semibold tracking-tight">Brand Janra</h1></div></div>
           <Button onClick={() => setControlRoomOpen(true)} className="bg-stone-950 text-white hover:bg-stone-800"><Settings2 className="mr-2 h-4 w-4" /> Control room</Button>
         </div>
       </header>

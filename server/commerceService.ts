@@ -14,9 +14,9 @@ export async function createDirectOrder(input: { slug: string; customerName: str
   const product = await getProductBySlug(input.slug);
   if (!product || product.status !== "active" || product.productType !== "direct" || product.availabilityStatus !== "in_stock" || !product.price) throw new Error("Direct product is not currently available");
   const orderReference = `AC-${nanoid(10).toUpperCase()}`;
-  const inserted = await db.insert(orders).values({ productId: product.id, orderReference, customerName: input.customerName.trim(), customerEmail: input.customerEmail.trim().toLowerCase(), amount: product.price, currency: product.currency, consentGiven: input.consentGiven });
+  const inserted = await db.insert(orders).values({ productId: product.id, orderReference, customerName: input.customerName.trim(), customerEmail: input.customerEmail.trim().toLowerCase(), amount: product.price, currency: product.currency, consentGiven: input.consentGiven }).returning({ id: orders.id });
   await db.insert(attributionEvents).values({ productId: product.id, platform: "storefront", eventType: "order", amount: product.price, externalReference: orderReference, consentGiven: input.consentGiven });
-  return { orderReference, productId: product.id, amount: product.price, currency: product.currency, insertId: inserted[0]?.insertId };
+  return { orderReference, productId: product.id, amount: product.price, currency: product.currency, insertId: inserted[0]?.id };
 }
 
 export async function getAnalyticsSummary() {

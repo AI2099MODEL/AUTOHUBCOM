@@ -1,65 +1,82 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, index } from "drizzle-orm/mysql-core";
+import { boolean, integer, index, numeric, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+const roleEnum = pgEnum("role", ["user", "admin"]);
+const productTypeEnum = pgEnum("productType", ["affiliate", "direct"]);
+const sourceTypeEnum = pgEnum("sourceType", ["affiliate", "supplier"]);
+const statusEnum = pgEnum("status", ["draft", "active", "paused"]);
+const availabilityStatusEnum = pgEnum("availabilityStatus", ["unknown", "in_stock", "out_of_stock"]);
+const claimSafetyStatusEnum = pgEnum("claimSafetyStatus", ["needs_review", "approved", "blocked"]);
+const linkStatusEnum = pgEnum("linkStatus", ["active", "expired", "paused", "needs_review"]);
+const platformEnum = pgEnum("platform", ["meta", "youtube"]);
+const socialStatusEnum = pgEnum("socialStatus", ["connected", "expired", "revoked", "needs_review"]);
+const contentPlatformEnum = pgEnum("contentPlatform", ["instagram", "facebook", "youtube"]);
+const contentStatusEnum = pgEnum("contentStatus", ["draft", "approved", "scheduled", "published", "blocked"]);
+const integrationStatusEnum = pgEnum("integrationStatus", ["not_connected", "connected", "blocked", "manual_fallback"]);
+const publishingStatusEnum = pgEnum("publishingStatus", ["queued", "running", "published", "failed", "paused"]);
+const eventTypeEnum = pgEnum("eventType", ["click", "outbound", "order", "revenue"]);
+const orderStatusEnum = pgEnum("orderStatus", ["pending", "paid", "fulfilled", "cancelled"]);
+const socialPlatformEnum = pgEnum("socialPlatform", ["meta", "youtube"]);
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: roleEnum().default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
-export const products = mysqlTable("products", {
-  id: int("id").autoincrement().primaryKey(),
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 160 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description").notNull(),
   category: varchar("category", { length: 120 }).notNull(),
-  productType: mysqlEnum("productType", ["affiliate", "direct"]).notNull(),
-  price: decimal("price", { precision: 12, scale: 2 }),
+  productType: productTypeEnum().notNull(),
+  price: numeric("price", { precision: 12, scale: 2 }),
   currency: varchar("currency", { length: 8 }).default("USD").notNull(),
   imageUrl: text("imageUrl"),
   destinationUrl: text("destinationUrl"),
-  status: mysqlEnum("status", ["draft", "active", "paused"]).default("draft").notNull(),
-  availabilityStatus: mysqlEnum("availabilityStatus", ["unknown", "in_stock", "out_of_stock"]).default("unknown").notNull(),
-  claimSafetyStatus: mysqlEnum("claimSafetyStatus", ["needs_review", "approved", "blocked"]).default("needs_review").notNull(),
-  audienceFitScore: int("audienceFitScore").default(0).notNull(),
-  profitabilityScore: int("profitabilityScore").default(0).notNull(),
-  availabilityScore: int("availabilityScore").default(0).notNull(),
-  safetyScore: int("safetyScore").default(0).notNull(),
+  status: statusEnum().default("draft").notNull(),
+  availabilityStatus: availabilityStatusEnum().default("unknown").notNull(),
+  claimSafetyStatus: claimSafetyStatusEnum().default("needs_review").notNull(),
+  audienceFitScore: integer("audienceFitScore").default(0).notNull(),
+  profitabilityScore: integer("profitabilityScore").default(0).notNull(),
+  availabilityScore: integer("availabilityScore").default(0).notNull(),
+  safetyScore: integer("safetyScore").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ statusIdx: index("products_status_idx").on(table.status), typeIdx: index("products_type_idx").on(table.productType) }));
 
-export const offerSources = mysqlTable("offer_sources", {
-  id: int("id").autoincrement().primaryKey(),
+export const offerSources = pgTable("offer_sources", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
-  sourceType: mysqlEnum("sourceType", ["affiliate", "supplier"]).notNull(),
+  sourceType: sourceTypeEnum().notNull(),
   endpointUrl: text("endpointUrl").notNull(),
   enabled: boolean("enabled").default(false).notNull(),
   lastCheckedAt: timestamp("lastCheckedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull(),
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
   orderReference: varchar("orderReference", { length: 80 }).notNull().unique(),
   customerName: varchar("customerName", { length: 160 }).notNull(),
   customerEmail: varchar("customerEmail", { length: 320 }).notNull(),
-  status: mysqlEnum("status", ["pending", "paid", "fulfilled", "cancelled"]).default("pending").notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  status: orderStatusEnum().default("pending").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 8 }).default("USD").notNull(),
   consentGiven: boolean("consentGiven").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const trackedLinks = mysqlTable("tracked_links", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull(),
+export const trackedLinks = pgTable("tracked_links", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
   token: varchar("token", { length: 80 }).notNull().unique(),
   source: varchar("source", { length: 80 }).notNull(),
   network: varchar("network", { length: 80 }).default("cj").notNull(),
@@ -67,65 +84,65 @@ export const trackedLinks = mysqlTable("tracked_links", {
   campaign: varchar("campaign", { length: 120 }).notNull(),
   destinationUrl: text("destinationUrl").notNull(),
   imageUrl: text("imageUrl"),
-  linkStatus: mysqlEnum("linkStatus", ["active", "expired", "paused", "needs_review"]).default("active").notNull(),
+  linkStatus: linkStatusEnum().default("active").notNull(),
   firstSeenAt: timestamp("firstSeenAt").defaultNow().notNull(),
   lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
   expiresAt: timestamp("expiresAt"),
   lastCheckedAt: timestamp("lastCheckedAt"),
   lastCheckError: text("lastCheckError"),
-  clickCount: int("clickCount").default(0).notNull(),
+  clickCount: integer("clickCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ productIdx: index("tracked_links_product_idx").on(table.productId), lifecycleIdx: index("tracked_links_lifecycle_idx").on(table.network, table.linkStatus, table.lastCheckedAt) }));
 
-export const socialConnections = mysqlTable("social_connections", {
-  id: int("id").autoincrement().primaryKey(),
-  platform: mysqlEnum("platform", ["meta", "youtube"]).notNull(),
+export const socialConnections = pgTable("social_connections", {
+  id: serial("id").primaryKey(),
+  platform: socialPlatformEnum().notNull(),
   accountId: varchar("accountId", { length: 180 }).notNull(),
   accountName: varchar("accountName", { length: 255 }),
   accessToken: text("accessToken").notNull(),
   refreshToken: text("refreshToken"),
   tokenExpiresAt: timestamp("tokenExpiresAt"),
   scopes: text("scopes"),
-  status: mysqlEnum("status", ["connected", "expired", "revoked", "needs_review"]).default("connected").notNull(),
+  status: socialStatusEnum().default("connected").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ platformIdx: index("social_connections_platform_idx").on(table.platform, table.status) }));
 
-export const contentPackages = mysqlTable("content_packages", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull(),
-  platform: mysqlEnum("platform", ["instagram", "facebook", "youtube"]).notNull(),
+export const contentPackages = pgTable("content_packages", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
+  platform: contentPlatformEnum().notNull(),
   title: varchar("title", { length: 255 }),
   caption: text("caption"),
   script: text("script"),
   callToAction: varchar("callToAction", { length: 255 }),
   disclosure: text("disclosure").notNull(),
   trackingUrl: text("trackingUrl"),
-  status: mysqlEnum("status", ["draft", "approved", "scheduled", "published", "blocked"]).default("draft").notNull(),
+  status: contentStatusEnum().default("draft").notNull(),
   scheduledAt: timestamp("scheduledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ productPlatformIdx: index("content_product_platform_idx").on(table.productId, table.platform) }));
 
-export const publishingJobs = mysqlTable("publishing_jobs", {
-  id: int("id").autoincrement().primaryKey(),
-  contentPackageId: int("contentPackageId").notNull(),
-  platform: mysqlEnum("platform", ["instagram", "facebook", "youtube"]).notNull(),
-  integrationStatus: mysqlEnum("integrationStatus", ["not_connected", "connected", "blocked", "manual_fallback"]).default("not_connected").notNull(),
-  status: mysqlEnum("status", ["queued", "running", "published", "failed", "paused"]).default("queued").notNull(),
-  retryCount: int("retryCount").default(0).notNull(),
+export const publishingJobs = pgTable("publishing_jobs", {
+  id: serial("id").primaryKey(),
+  contentPackageId: integer("contentPackageId").notNull(),
+  platform: contentPlatformEnum().notNull(),
+  integrationStatus: integrationStatusEnum().default("not_connected").notNull(),
+  status: publishingStatusEnum().default("queued").notNull(),
+  retryCount: integer("retryCount").default(0).notNull(),
   lastError: text("lastError"),
   scheduledAt: timestamp("scheduledAt"),
   publishedAt: timestamp("publishedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export const attributionEvents = mysqlTable("attribution_events", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull(),
-  contentPackageId: int("contentPackageId"),
+export const attributionEvents = pgTable("attribution_events", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
+  contentPackageId: integer("contentPackageId"),
   platform: varchar("platform", { length: 80 }).notNull(),
-  eventType: mysqlEnum("eventType", ["click", "outbound", "order", "revenue"]).notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }),
+  eventType: eventTypeEnum().notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }),
   externalReference: varchar("externalReference", { length: 180 }),
   consentGiven: boolean("consentGiven").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

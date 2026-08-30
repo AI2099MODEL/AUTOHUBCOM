@@ -1,15 +1,24 @@
 import { eq, sql } from "drizzle-orm";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { InsertUser, User, attributionEvents, contentPackages, products, users, trackedLinks, socialConnections } from "../drizzle/schema.js";
 import { ENV } from "./_core/env.js";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
 function encryptSecret(value?: string) { if (!value) return value; const key = createHash("sha256").update(process.env.JWT_SECRET || "brandjanra-token-key").digest(); const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", key, iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return `v1:${iv.toString("base64url")}:${cipher.getAuthTag().toString("base64url")}:${encrypted.toString("base64url")}`; }
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
+    try {
+      const protocol = new URL(process.env.DATABASE_URL).protocol;
+      if (protocol !== "postgres:" && protocol !== "postgresql:") {
+        console.warn("[Database] PostgreSQL driver requires a postgres:// DATABASE_URL; skipping legacy database URL.");
+        return null;
+      }
+      _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+      _db = drizzle(_pool); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
   }
   return _db;
 }
@@ -26,7 +35,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; } else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string): Promise<User | undefined> {
@@ -58,8 +67,8 @@ export async function upsertTrackedLink(input: { productId: number; token: strin
     await db.update(trackedLinks).set({ destinationUrl: input.destinationUrl, imageUrl: input.imageUrl, linkStatus: input.status || "active", lastSeenAt: now, lastCheckedAt: now, lastCheckError: null }).where(eq(trackedLinks.id, existing[0].id));
     return existing[0].id;
   }
-  const result = await db.insert(trackedLinks).values({ productId: input.productId, token: input.token, source: input.source, network: input.network || "cj", externalLinkId: input.externalLinkId, campaign: input.campaign, destinationUrl: input.destinationUrl, imageUrl: input.imageUrl, linkStatus: input.status || "active", firstSeenAt: now, lastSeenAt: now, lastCheckedAt: now });
-  return result[0]?.insertId;
+  const result = await db.insert(trackedLinks).values({ productId: input.productId, token: input.token, source: input.source, network: input.network || "cj", externalLinkId: input.externalLinkId, campaign: input.campaign, destinationUrl: input.destinationUrl, imageUrl: input.imageUrl, linkStatus: input.status || "active", firstSeenAt: now, lastSeenAt: now, lastCheckedAt: now }).returning({ id: trackedLinks.id });
+  return result[0]?.id;
 }
 
 export async function getTrackedLinkLifecycle() {
@@ -77,7 +86,7 @@ export async function saveSocialConnection(input: { platform: "meta" | "youtube"
   const existing = await db.select().from(socialConnections).where(eq(socialConnections.accountId, input.accountId)).limit(1);
   const safeInput = { ...input, accessToken: encryptSecret(input.accessToken)!, refreshToken: encryptSecret(input.refreshToken) };
   if (existing[0]) { await db.update(socialConnections).set({ ...safeInput, status: "connected" }).where(eq(socialConnections.id, existing[0].id)); return existing[0].id; }
-  const result = await db.insert(socialConnections).values({ ...safeInput, status: "connected" }); return result[0]?.insertId;
+  const result = await db.insert(socialConnections).values({ ...safeInput, status: "connected" }).returning({ id: socialConnections.id }); return result[0]?.id;
 }
 
 export async function getSocialConnections() {
