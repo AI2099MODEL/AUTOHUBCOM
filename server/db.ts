@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { InsertUser, User, attributionEvents, contentPackages, products, users, trackedLinks, socialConnections } from "../drizzle/schema.js";
 import { ENV } from "./_core/env.js";
+import { getPostgresConnectionString } from "./_core/postgres.js";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -17,7 +18,7 @@ export async function getDb() {
         console.warn("[Database] PostgreSQL driver requires a postgres:// DATABASE_URL; skipping legacy database URL.");
         return null;
       }
-      _pool = new Pool({ connectionString: ENV.databaseUrl, ssl: { rejectUnauthorized: false } });
+      _pool = new Pool({ connectionString: getPostgresConnectionString(ENV.databaseUrl), ssl: { rejectUnauthorized: false } });
       _db = drizzle(_pool); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
   }
   return _db;

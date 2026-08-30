@@ -1,12 +1,13 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Pool } from "pg";
+import { getDatabaseUrl, getPostgresConnectionString } from "../../server/_core/postgres";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false, message: "Use GET or POST." });
   const expected = process.env.CRON_SECRET; if (expected && String(req.headers.authorization || "") !== `Bearer ${expected}`) return res.status(401).json({ ok: false, message: "Unauthorized." });
-  const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.SUPABASE_DB_URL || "";
+  const databaseUrl = getDatabaseUrl();
   if (!databaseUrl) return res.status(503).json({ ok: false, message: "No Vercel/Supabase PostgreSQL URL is configured in the production deployment." });
-  const pool = new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 2 });
+  const pool = new Pool({ connectionString: getPostgresConnectionString(databaseUrl), ssl: { rejectUnauthorized: false }, max: 2 });
   try {
     const { rows } = await pool.query<{ id: number; destinationUrl: string }>(`SELECT "id", "destinationUrl" FROM tracked_links WHERE "linkStatus" = 'active' ORDER BY "lastCheckedAt" ASC NULLS FIRST LIMIT 100`);
     let active = 0; let expired = 0;
