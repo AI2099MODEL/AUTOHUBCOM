@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
   "crons": [
-    { "path": "/api/scheduled/awin-sync", "schedule": "0 1 * * *" },
+    { "path": "/api/scheduled/awin-sync", "schedule": "*/30 * * * *" },
     { "path": "/api/scheduled/cj-sync", "schedule": "0 2 * * *" },
     { "path": "/api/scheduled/check-links", "schedule": "0 3 * * *" }
   ],
