@@ -3,7 +3,7 @@ import { getDb, upsertTrackedLink } from "./db.js";
 import { products, trackedLinks } from "../drizzle/schema.js";
 
 type CjSyncInput = { apiToken: string; companyId: string; pid: string; keyword?: string; limit?: number };
-export type CjProduct = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string };
+export type CjProduct = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string; trackingToken: string; network: string; marketHint: string };
 let syncedProducts: CjProduct[] = [];
 
 export async function getSyncedAffiliateProducts(): Promise<CjProduct[]> {
@@ -12,6 +12,8 @@ export async function getSyncedAffiliateProducts(): Promise<CjProduct[]> {
   try {
     const rows = await db.select({
       id: trackedLinks.externalLinkId,
+      trackingToken: trackedLinks.token,
+      network: trackedLinks.network,
       title: products.name,
       description: products.description,
       price: products.price,
@@ -21,12 +23,10 @@ export async function getSyncedAffiliateProducts(): Promise<CjProduct[]> {
       imageUrl: trackedLinks.imageUrl,
       syncedAt: trackedLinks.lastSeenAt,
     }).from(trackedLinks).innerJoin(products, eq(trackedLinks.productId, products.id)).where(sql`${trackedLinks.network} IN ('cj', 'awin') AND ${trackedLinks.linkStatus} = 'active' AND ${products.destinationUrl} IS NOT NULL`).orderBy(sql`${trackedLinks.lastSeenAt} desc`).limit(50);
-    return rows.filter((row) => row.id && row.clickUrl).map((row) => ({
-      id: String(row.id), title: row.title, description: row.description, price: row.price ? String(row.price) : "View offer", currency: row.currency || "", advertiserName: row.advertiserName, clickUrl: row.clickUrl, imageUrl: row.imageUrl || "", syncedAt: row.syncedAt.toISOString(),
+    return rows.filter((row) => row.id && row.clickUrl && row.trackingToken).map((row) => ({
+      id: String(row.id), trackingToken: String(row.trackingToken), network: String(row.network || "affiliate"), title: row.title, description: row.description, price: row.price ? String(row.price) : "", currency: row.currency || "", advertiserName: row.advertiserName, clickUrl: row.clickUrl, imageUrl: row.imageUrl || "", syncedAt: row.syncedAt.toISOString(), marketHint: `${row.currency || ""} ${row.title || ""} ${row.description || ""} ${row.advertiserName || ""}`.toLowerCase(),
     }));
-  } catch {
-    return syncedProducts;
-  }
+    } catch { return syncedProducts; }
 }
 
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 140) || "cj-product";
@@ -52,7 +52,7 @@ export async function syncCjProducts(input: CjSyncInput) {
     const db = await getDb();
     const result: CjProduct[] = [];
     for (const product of realRows.slice(0, Math.min(input.limit || 12, 50))) {
-      const item: CjProduct = { id: String(product.id), title: String(product.title), description: String(product.description || ""), price: String(product.price?.amount || "View offer"), currency: String(product.price?.currency || ""), advertiserName: String(product.advertiserName), clickUrl: String(product.linkCode.clickUrl), imageUrl: String(product.imageUrl || product.image?.url || ""), syncedAt: new Date().toISOString() };
+      const item: CjProduct = { id: String(product.id), trackingToken: `cj:${String(product.id)}`, network: "cj", marketHint: `${product.price?.currency || ""} ${product.title || ""} ${product.description || ""} ${product.advertiserName || ""}`.toLowerCase(), title: String(product.title), description: String(product.description || ""), price: String(product.price?.amount || "View offer"), currency: String(product.price?.currency || ""), advertiserName: String(product.advertiserName), clickUrl: String(product.linkCode.clickUrl), imageUrl: String(product.imageUrl || product.image?.url || ""), syncedAt: new Date().toISOString() };
       if (db) {
         const productSlug = slugify(`cj-${item.id}`);
         const saved = await db.insert(products).values({ slug: productSlug, name: item.title.slice(0, 255), description: item.description.slice(0, 5000), category: "CJ Affiliate", productType: "affiliate", price: item.price === "View offer" ? null : item.price, currency: item.currency || "USD", imageUrl: item.imageUrl || null, destinationUrl: item.clickUrl, status: "active", availabilityStatus: "unknown", claimSafetyStatus: "needs_review", audienceFitScore: 0, profitabilityScore: 0, availabilityScore: 0, safetyScore: 0 }).onConflictDoUpdate({ target: products.slug, set: { name: item.title.slice(0, 255), description: item.description.slice(0, 5000), price: item.price === "View offer" ? null : item.price, currency: item.currency || "USD", imageUrl: item.imageUrl || null, destinationUrl: item.clickUrl, status: "active", updatedAt: new Date() } }).returning({ id: products.id });

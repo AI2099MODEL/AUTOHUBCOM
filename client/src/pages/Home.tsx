@@ -1,4 +1,5 @@
 import { ArrowUpRight, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
@@ -13,6 +14,8 @@ type AffiliateProduct = {
   clickUrl: string;
   imageUrl: string;
   syncedAt: string;
+  trackingToken: string;
+  network: string;
 };
 
 const socialProfiles = [
@@ -35,7 +38,7 @@ export default function Home() {
             <img src="/manus-storage/Logo_294c6d62.png" alt="Janra" className="h-11 w-11 rounded-full object-cover shadow-sm" />
             <div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-stone-500">Global health & beauty</p><h1 className="font-display text-2xl font-semibold tracking-tight">Brand Janra</h1></div>
           </div>
-          <span className="text-sm text-stone-500">Official Storefront</span>
+          <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-stone-500">Official Storefront</span><nav className="flex gap-2 text-xs text-stone-600" aria-label="Markets"><Link href="/usa" className="hover:text-stone-950">USA</Link><Link href="/canada" className="hover:text-stone-950">Canada</Link><Link href="/india" className="hover:text-stone-950">India</Link><Link href="/uk" className="hover:text-stone-950">UK</Link></nav></div>
         </div>
       </header>
 
@@ -53,7 +56,7 @@ export default function Home() {
           <div className="mb-7"><p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">Janra selections</p><h3 className="mt-2 font-display text-4xl">Curated catalog</h3></div>
           {affiliateProductsQuery.isLoading && <p className="py-12 text-sm text-stone-500">Loading products…</p>}
           {!affiliateProductsQuery.isLoading && products.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-7 py-12 text-center"><p className="font-semibold">No products yet</p><p className="mt-2 text-sm text-stone-600">New selections will appear here soon.</p></div>}
-          {products.length > 0 && <div className="grid gap-5 md:grid-cols-3">{products.map((product) => <Card key={`${product.advertiserName}-${product.id}`} className="overflow-hidden border-stone-200 bg-white shadow-sm"><div className="relative h-56 overflow-hidden bg-stone-100"><img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} /><div className="absolute inset-0 bg-gradient-to-t from-stone-950/45 to-transparent" /><div className="absolute bottom-4 left-5"><span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-stone-700">Featured selection</span></div></div><CardContent className="p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-wider text-stone-500">{product.advertiserName}</p><h4 className="mt-1 text-lg font-semibold">{product.title}</h4><p className="mt-2 text-sm text-stone-500">Curated selection</p></div><p className="font-semibold">{product.currency ? `${product.currency} ` : ""}{product.price}</p></div><p className="mt-3 line-clamp-3 text-sm leading-6 text-stone-600">{product.description}</p><a href={product.clickUrl} target="_blank" rel="noreferrer sponsored noopener" className="mt-5 block"><Button variant="outline" className="w-full border-stone-300">View offer <ChevronRight className="ml-auto h-4 w-4" /></Button></a></CardContent></Card>)}</div>}
+          {products.length > 0 && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{products.map((product) => <Card key={`${product.advertiserName}-${product.id}`} className="overflow-hidden border-stone-200 bg-white shadow-sm"><Link href={`/product/${encodeURIComponent(product.trackingToken)}`} className="block"><div className="relative h-32 overflow-hidden bg-stone-100"><img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} /><div className="absolute inset-0 bg-gradient-to-t from-stone-950/45 to-transparent" /><div className="absolute bottom-2 left-3"><span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-stone-700">Featured selection</span></div></div></Link><CardContent className="p-3.5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-[10px] uppercase tracking-wider text-stone-500">{product.advertiserName}</p><Link href={`/product/${encodeURIComponent(product.trackingToken)}`}><h4 className="mt-1 line-clamp-2 text-sm font-semibold leading-5">{product.title}</h4></Link></div>{product.price && <p className="shrink-0 text-xs font-semibold">{product.currency ? `${product.currency} ` : ""}{product.price}</p>}</div><p className="mt-2 line-clamp-2 text-xs leading-5 text-stone-600">{product.description || "Product details available from the seller."}</p><Link href={`/product/${encodeURIComponent(product.trackingToken)}`} className="mt-3 flex items-center text-xs font-semibold">View details <ChevronRight className="ml-auto h-3.5 w-3.5" /></Link></CardContent></Card>)}</div>}
         </section>
 
       </main>
