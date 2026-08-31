@@ -19,7 +19,7 @@ function affiliateUrl(publisherId: string, advertiserId: number, destination: st
 }
 
 async function fetchProgrammes(publisherId: string, token: string): Promise<Programme[]> {
-  const url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/programmes?relationship=joined&includeHidden=false`;
+  const url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/programmes?relationship=joined`;
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
   const raw = await response.text();
   if (!response.ok) throw new Error(`Awin programme discovery failed with HTTP ${response.status}: ${raw.slice(0, 180)}`);
