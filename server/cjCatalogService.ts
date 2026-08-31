@@ -6,7 +6,7 @@ type CjSyncInput = { apiToken: string; companyId: string; pid: string; keyword?:
 export type CjProduct = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string };
 let syncedProducts: CjProduct[] = [];
 
-export async function getSyncedCjProducts(): Promise<CjProduct[]> {
+export async function getSyncedAffiliateProducts(): Promise<CjProduct[]> {
   const db = await getDb();
   if (!db) return syncedProducts;
   try {
@@ -20,7 +20,7 @@ export async function getSyncedCjProducts(): Promise<CjProduct[]> {
       clickUrl: trackedLinks.destinationUrl,
       imageUrl: trackedLinks.imageUrl,
       syncedAt: trackedLinks.lastSeenAt,
-    }).from(trackedLinks).innerJoin(products, eq(trackedLinks.productId, products.id)).where(sql`${trackedLinks.network} = 'cj' AND ${trackedLinks.linkStatus} = 'active' AND ${products.destinationUrl} IS NOT NULL`).orderBy(sql`${trackedLinks.lastSeenAt} desc`).limit(50);
+    }).from(trackedLinks).innerJoin(products, eq(trackedLinks.productId, products.id)).where(sql`${trackedLinks.network} IN ('cj', 'awin') AND ${trackedLinks.linkStatus} = 'active' AND ${products.destinationUrl} IS NOT NULL`).orderBy(sql`${trackedLinks.lastSeenAt} desc`).limit(50);
     return rows.filter((row) => row.id && row.clickUrl).map((row) => ({
       id: String(row.id), title: row.title, description: row.description, price: row.price ? String(row.price) : "View offer", currency: row.currency || "", advertiserName: row.advertiserName, clickUrl: row.clickUrl, imageUrl: row.imageUrl || "", syncedAt: row.syncedAt.toISOString(),
     }));
@@ -30,6 +30,11 @@ export async function getSyncedCjProducts(): Promise<CjProduct[]> {
 }
 
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 140) || "cj-product";
+
+export async function getSyncedCjProducts(): Promise<CjProduct[]> {
+  const rows = await getSyncedAffiliateProducts();
+  return rows.filter((row) => row.advertiserName && !row.advertiserName.toLowerCase().includes("awin"));
+}
 
 export async function syncCjProducts(input: CjSyncInput) {
   if (!input.apiToken.trim() || input.apiToken.trim().length < 8) return { ok: false, message: "A CJ Personal Access Token is required for Product Feed API calls.", products: [] as CjProduct[] } as const;
