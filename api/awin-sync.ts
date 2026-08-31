@@ -28,8 +28,13 @@ async function fetchProgrammes(publisherId: string, token: string): Promise<Prog
 
 async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string) {
   const url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/awinfeeds/download/${advertiserId}-retail-${locale}.jsonl`;
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "*/*" } });
-  if (!response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response.status}` };
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/jsonl, application/json, */*", "User-Agent": "BrandJanraSync/1.0" } });
+    if (response.status !== 406 || response.ok || attempt === 2) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+  }
+  if (!response || !response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response?.status || 502}` };
   const raw = await response.text();
   const products: FeedProduct[] = [];
   for (const line of raw.split(/\r?\n/)) {

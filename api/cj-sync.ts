@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json(error("CJ endpoint only accepts POST requests."));
   let body: any; try { body = readBody(req); } catch { return res.status(400).json(error("The request body was not valid JSON.")); }
-  const token = String(body.apiToken || process.env.CJ_API_TOKEN || "").trim();
+  const token = String(body.apiToken || process.env.CJ_API || process.env.CJ_API_TOKEN || "").trim();
   const pid = String(body.pid || process.env.CJ_PID || "").replace(/[^0-9]/g, "");
   const keyword = String(body.keyword || "").replace(/[^a-zA-Z0-9 +\-]/g, "");
   if (token.length < 8) return res.status(400).json(error("A CJ Personal Access Token is required."));
