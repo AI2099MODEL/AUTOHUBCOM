@@ -58,8 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!token) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add AWIN_PUBLISHER_API_TOKEN in the production environment." });
   if (!databaseUrl) return res.status(503).json({ ok: false, message: "Awin sync requires a PostgreSQL database connection." });
 
-  const locale = String((req.body as any)?.locale || process.env.AWIN_FEED_LOCALE || "en_GB");
-  const maxProductsPerAdvertiser = Math.min(Math.max(Number((req.body as any)?.limit || process.env.AWIN_PRODUCTS_PER_ADVERTISER || 100), 1), 500);
+  const requestedLocale = String((req.body as any)?.locale || (req.query as any)?.locale || "").trim();
+  const locale = requestedLocale || process.env.AWIN_FEED_LOCALE || "en_GB";
+  const maxProductsPerAdvertiser = Math.min(Math.max(Number((req.body as any)?.limit || (req.query as any)?.limit || process.env.AWIN_PRODUCTS_PER_ADVERTISER || 100), 1), 500);
   const pool = new Pool({ connectionString: getConnectionString(databaseUrl), ssl: { rejectUnauthorized: false }, max: 2 });
   try {
     const programmes = await fetchProgrammes(publisherId, token);
