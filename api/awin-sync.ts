@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Pool } from "pg";
+import { gunzipSync } from "node:zlib";
 
 const getDatabaseUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.SUPABASE_DB_URL || "";
 const getConnectionString = (raw: string) => { try { const url = new URL(raw.replace(/^postgresql:\/\//, "postgres://")); ["sslmode", "sslcert", "sslkey", "sslrootcert"].forEach((key) => url.searchParams.delete(key)); return url.toString(); } catch { return raw.replace(/^postgresql:\/\//, "postgres://"); } };
@@ -46,7 +47,60 @@ async function fetchProgrammes(publisherId: string, token: string): Promise<Prog
   return Array.isArray(parsed) ? parsed.filter((p): p is Programme => Number.isFinite(Number(p?.id))) : [];
 }
 
-async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string, feedApiKey = "") {
+let directFeedCache: { url: string; products: FeedProduct[] } | undefined;
+
+function parseCsvLine(line: string) {
+  const values: string[] = []; let current = ""; let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && line[i + 1] === '"' && quoted) { current += '"'; i++; continue; }
+    if (char === '"') { quoted = !quoted; continue; }
+    if (char === ',' && !quoted) { values.push(current.trim()); current = ""; continue; }
+    current += char;
+  }
+  values.push(current.trim());
+  return values;
+}
+
+async function fetchDirectCsvFeed(feedUrl: string, advertiserId: number) {
+  if (directFeedCache?.url === feedUrl) {
+    const products = advertiserId > 0 ? directFeedCache.products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : directFeedCache.products;
+    return { products, skipped: false, reason: "" };
+  }
+  const response = await fetch(feedUrl, { headers: { Accept: "application/gzip, text/csv, */*", "User-Agent": "BrandJanraSync/1.0" } });
+  if (!response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response.status}` };
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const contentEncoding = (response.headers.get("content-encoding") || "").toLowerCase();
+  const rawBytes = contentEncoding.includes("gzip") || bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes;
+  const rows = rawBytes.toString("utf8").split(/\r?\n/).filter(Boolean);
+  if (!rows.length) return { products: [] as FeedProduct[], skipped: true, reason: "Empty Awin CSV feed" };
+  const headers = parseCsvLine(rows[0]).map((header) => header.toLowerCase());
+  const products: FeedProduct[] = [];
+  for (const row of rows.slice(1)) {
+    const values = parseCsvLine(row); const item: FeedProduct = {};
+    headers.forEach((header, index) => { item[header] = values[index] || ""; });
+    const merchantId = text(item.merchant_id);
+    if (merchantId && merchantId !== String(advertiserId)) continue;
+    products.push({
+      id: item.aw_product_id || item.merchant_product_id,
+      title: item.product_name,
+      description: item.description,
+      link: item.aw_deep_link || item.merchant_deep_link,
+      image_link: item.merchant_image_url || item.aw_image_url,
+      price: item.display_price || item.search_price || item.store_price,
+      currency: item.currency,
+      merchant_name: item.merchant_name,
+      merchant_id: merchantId,
+      availability: "in_stock",
+      product_type: item.merchant_category || item.category_name,
+    });
+  }
+  directFeedCache = { url: feedUrl, products };
+  return { products: advertiserId > 0 ? products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : products, skipped: false, reason: "" };
+}
+
+async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string, feedApiKey = "", directFeedUrl = "") {
+  if (directFeedUrl) return fetchDirectCsvFeed(directFeedUrl, advertiserId);
   let url = "";
   if (feedApiKey) {
     try { url = await fetchFeedFromList(feedApiKey, advertiserId, locale); }
@@ -81,6 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const publisherId = process.env.AWIN_PUBLISHER_ID || "3064649";
   const token = process.env.AWIN_PUBLISHER_API_TOKEN || process.env.AWIN_API_TOKEN || process.env.AWIN_API_TOKEN_VALUE || "";
   const feedApiKey = process.env.AWIN_PRODUCT_FEED_API_KEY || process.env.AWIN_FEED_API_KEY || "";
+  const directFeedUrl = process.env.AWIN_PRODUCT_FEED_URL || process.env.AWIN_FEED_URL || "";
   const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
   const databaseUrl = getDatabaseUrl();
   if (!token) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add AWIN_PUBLISHER_API_TOKEN in the production environment." });
@@ -93,15 +148,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const programmes = await fetchProgrammes(publisherId, token);
     const activeProgrammes = programmes.filter((p) => String(p.status || "active").toLowerCase() === "active");
-    const selected = configuredAdvertiserIds.length
-      ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
-      : activeProgrammes;
+    const selected = directFeedUrl || feedApiKey
+      ? activeProgrammes
+      : configuredAdvertiserIds.length
+        ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
+        : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
     const advertiserResults: Array<{ id: number; name: string; imported: number; feed: string }> = [];
 
     for (const programme of selected) {
       const advertiserId = Number(programme.id);
-      const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey);
+      const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey, directFeedUrl);
       const feedProducts = feed.products;
       const feedStatus = feed.reason;
       if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: 0, feed: feed.reason }); continue; }
@@ -133,7 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } finally { await pool.end(); }
 }
 
-export { fetchProgrammes, fetchFeed, fetchFeedFromList, affiliateUrl };
+export { fetchProgrammes, fetchFeed, fetchFeedFromList, fetchDirectCsvFeed, affiliateUrl };
 
 // This endpoint intentionally never returns or logs the Awin token.
 // Product feeds are processed sequentially to respect Awin's feed request limits.
