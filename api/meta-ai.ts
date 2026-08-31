@@ -21,8 +21,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ error: "Meta AI is not configured. Add MODEL_API_KEY to the production environment." });
   }
 
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const payload = { ...DEFAULT_PAYLOAD, ...body };
+  const body = req.body && typeof req.body === "object" ? req.body as { input?: unknown } : {};
+  const payload = {
+    ...DEFAULT_PAYLOAD,
+    input: Array.isArray(body.input) ? body.input : DEFAULT_PAYLOAD.input,
+  };
 
   try {
     const upstream = await fetch("https://api.meta.ai/v1/responses", {
