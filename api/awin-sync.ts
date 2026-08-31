@@ -1,31 +1,207 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Pool } from "pg";
+import { gunzipSync } from "node:zlib";
 
-type Product = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string };
-const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => value?.trim())?.trim() || "";
-const databaseUrl = () => env("DATABASE_URL", "POSTGRES_URL", "POSTGRES_PRISMA_URL", "SUPABASE_DB_URL");
-const cleanUrl = (raw: string) => { try { const url = new URL(raw); ["sslmode", "sslcert", "sslkey", "sslrootcert"].forEach((key) => url.searchParams.delete(key)); return url.toString(); } catch { return raw; } };
-const tag = (block: string, name: string) => block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i"))?.[1]?.replace(/<!\\[CDATA\\[|\\]\\]>/g, "").trim() || "";
-const csv = (raw: string) => { const rows: string[][] = []; let row: string[] = [], field = "", quoted = false; for (let i = 0; i < raw.length; i++) { const char = raw[i], next = raw[i + 1]; if (char === '"' && quoted && next === '"') { field += '"'; i++; } else if (char === '"') quoted = !quoted; else if (char === ',' && !quoted) { row.push(field); field = ""; } else if ((char === "\n" || char === "\r") && !quoted) { if (char === "\r" && next === "\n") i++; row.push(field); if (row.some((cell) => cell.trim())) rows.push(row); row = []; field = ""; } else field += char; } if (field || row.length) { row.push(field); rows.push(row); } return rows; };
-const result = (res: VercelResponse, status: number, message: string, products: Product[] = []) => res.status(status).json({ ok: status < 400 && products.length > 0, message, products });
+const getDatabaseUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.SUPABASE_DB_URL || "";
+const getConnectionString = (raw: string) => { try { const url = new URL(raw.replace(/^postgresql:\/\//, "postgres://")); ["sslmode", "sslcert", "sslkey", "sslrootcert"].forEach((key) => url.searchParams.delete(key)); return url.toString(); } catch { return raw.replace(/^postgresql:\/\//, "postgres://"); } };
+
+type Programme = { id: number; name?: string; status?: string; currencyCode?: string; primaryRegion?: { countryCode?: string } };
+type FeedProduct = Record<string, unknown>;
+const text = (value: unknown, fallback = "") => typeof value === "string" ? value.trim() : value == null ? fallback : String(value).trim();
+const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 110) || "awin-product";
+const firstUrl = (...values: unknown[]) => values.map((v) => text(v)).find((v) => /^https?:\/\//i.test(v)) || "";
+const parsePrice = (value: unknown) => { const match = text(value).match(/[0-9]+(?:[.,][0-9]+)?/); return match ? match[0].replace(",", ".") : null; };
+const parseCurrency = (value: unknown, fallback: string) => { const match = text(value).match(/[A-Z]{3}/); return match?.[0] || fallback || "USD"; };
+const categoryFrom = (p: FeedProduct) => text(p.google_product_category || p.product_type || p.category || "Awin affiliate").split(">" )[0].trim().slice(0, 120) || "Awin affiliate";
+
+function affiliateUrl(publisherId: string, advertiserId: number, destination: string) {
+  return `https://www.awin1.com/cread.php?awinmid=${advertiserId}&awinaffid=${encodeURIComponent(publisherId)}&ued=${encodeURIComponent(destination)}`;
+}
+
+function extractCsvUrl(line: string) {
+  return line.match(/https?:\/\/[^,\s"']+/i)?.[0]?.replace(/["']+$/g, "") || "";
+}
+
+async function fetchFeedFromList(feedApiKey: string, advertiserId: number, locale: string) {
+  const listUrl = process.env.AWIN_PRODUCT_FEED_LIST_URL || `https://productdata.awin.com/datafeed/list/apikey/${encodeURIComponent(feedApiKey)}`;
+  const response = await fetch(listUrl, { headers: { Accept: "text/csv, text/plain, */*", "User-Agent": "BrandJanraSync/1.0" } });
+  if (!response.ok) throw new Error(`Awin product-feed list returned HTTP ${response.status}`);
+  const raw = await response.text();
+  const wantedId = String(advertiserId);
+  const wantedLocale = locale.toLowerCase();
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim() || line.toLowerCase().startsWith("advertiser id")) continue;
+    const fields = parseCsvLine(line);
+    const normalized = line.toLowerCase();
+    const membership = text(fields[3]).toLowerCase();
+    const language = text(fields[7]).toLowerCase();
+    if (!normalized.includes(wantedId) || (!language && !normalized.includes(wantedLocale))) continue;
+    if (membership && !["joined", "active"].includes(membership)) continue;
+    const url = extractCsvUrl(line);
+    if (url) return url;
+  }
+  return "";
+}
+
+async function fetchProgrammes(publisherId: string, token: string): Promise<Programme[]> {
+  const url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/programmes?relationship=joined`;
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+  const raw = await response.text();
+  if (!response.ok) throw new Error(`Awin programme discovery failed with HTTP ${response.status}: ${raw.slice(0, 180)}`);
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed.filter((p): p is Programme => Number.isFinite(Number(p?.id))) : [];
+}
+
+let directFeedCache: { url: string; products: FeedProduct[] } | undefined;
+
+function parseCsvLine(line: string) {
+  const values: string[] = []; let current = ""; let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && line[i + 1] === '"' && quoted) { current += '"'; i++; continue; }
+    if (char === '"') { quoted = !quoted; continue; }
+    if (char === ',' && !quoted) { values.push(current.trim()); current = ""; continue; }
+    current += char;
+  }
+  values.push(current.trim());
+  return values;
+}
+
+async function fetchDirectCsvFeed(feedUrl: string, advertiserId: number) {
+  if (directFeedCache?.url === feedUrl) {
+    const products = advertiserId > 0 ? directFeedCache.products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : directFeedCache.products;
+    return { products, skipped: false, reason: "" };
+  }
+  const response = await fetch(feedUrl, { headers: { Accept: "application/gzip, text/csv, */*", "User-Agent": "BrandJanraSync/1.0" } });
+  if (!response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response.status}` };
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const contentEncoding = (response.headers.get("content-encoding") || "").toLowerCase();
+  const rawBytes = contentEncoding.includes("gzip") || bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes;
+  const rows = rawBytes.toString("utf8").split(/\r?\n/).filter(Boolean);
+  if (!rows.length) return { products: [] as FeedProduct[], skipped: true, reason: "Empty Awin CSV feed" };
+  const headers = parseCsvLine(rows[0]).map((header) => header.toLowerCase());
+  const products: FeedProduct[] = [];
+  for (const row of rows.slice(1)) {
+    const values = parseCsvLine(row); const item: FeedProduct = {};
+    headers.forEach((header, index) => { item[header] = values[index] || ""; });
+    const merchantId = text(item.merchant_id);
+    if (merchantId && merchantId !== String(advertiserId)) continue;
+    products.push({
+      id: item.aw_product_id || item.merchant_product_id,
+      title: item.product_name,
+      description: item.description,
+      link: item.aw_deep_link || item.merchant_deep_link,
+      image_link: item.merchant_image_url || item.aw_image_url,
+      price: item.display_price || item.search_price || item.store_price,
+      currency: item.currency,
+      merchant_name: item.merchant_name,
+      merchant_id: merchantId,
+      availability: "in_stock",
+      product_type: item.merchant_category || item.category_name,
+    });
+  }
+  directFeedCache = { url: feedUrl, products };
+  return { products: advertiserId > 0 ? products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : products, skipped: false, reason: "" };
+}
+
+async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string, feedApiKey = "", directFeedUrl = "") {
+  if (directFeedUrl) return fetchDirectCsvFeed(directFeedUrl, advertiserId);
+  let url = "";
+  if (feedApiKey) {
+    try { url = await fetchFeedFromList(feedApiKey, advertiserId, locale); }
+    catch (error) { return { products: [] as FeedProduct[], skipped: true, reason: error instanceof Error ? error.message : "Product-feed list request failed" }; }
+    if (!url) return { products: [] as FeedProduct[], skipped: true, reason: `No accessible product feed for advertiser ${advertiserId} and locale ${locale}` };
+  } else {
+    url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/awinfeeds/download/${advertiserId}-retail-${locale}.jsonl`;
+  }
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/jsonl, application/json, */*", "User-Agent": "BrandJanraSync/1.0" } });
+    if (response.status !== 406 || response.ok || attempt === 2) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+  }
+  if (!response || !response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response?.status || 502}` };
+  const raw = await response.text();
+  const products: FeedProduct[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const item = JSON.parse(line);
+      if (item && typeof item === "object" && !item.error && !item.meta) products.push(item);
+    } catch { /* Ignore malformed lines; Awin feeds are JSONL and may include a terminal status line. */ }
+  }
+  return { products, skipped: false, reason: "" };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "GET" && req.method !== "POST") return result(res, 405, "Awin sync accepts GET or POST requests.");
-  const feedUrl = env("AWIN_PRODUCT_FEED_URL", "AWIN_PRODUCT_FEED_LIST_URL");
-  const token = env("AWIN_PRODUCT_FEED_API_KEY", "AWIN_PUBLISHER_API_TOKEN", "AWIN_API_TOKEN");
-  const publisherId = env("AWIN_PUBLISHER_ID");
-  const advertiserId = env("AWIN_ADVERTISER", "AWIN_ADVERTISER_ID");
-  if (!feedUrl) return result(res, 503, "Awin feed URL is not configured. Add AWIN_PRODUCT_FEED_URL or AWIN_PRODUCT_FEED_LIST_URL in Vercel Production.");
+  if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false, message: "Use GET or POST." });
+  const expected = process.env.CRON_SECRET;
+  if (expected && String(req.headers.authorization || "") !== `Bearer ${expected}`) return res.status(401).json({ ok: false, message: "Unauthorized." });
+  const publisherId = process.env.AWIN_PUBLISHER_ID || "3064649";
+  const token = process.env.AWIN_PUBLISHER_API_TOKEN || process.env.AWIN_API_TOKEN || process.env.AWIN_API_TOKEN_VALUE || "";
+  const feedApiKey = process.env.AWIN_PRODUCT_FEED_API_KEY || process.env.AWIN_FEED_API_KEY || "";
+  const feedListUrl = process.env.AWIN_PRODUCT_FEED_LIST_URL || "";
+  const directFeedUrl = process.env.AWIN_PRODUCT_FEED_URL || process.env.AWIN_FEED_URL || "";
+  const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || process.env.AWIN_ADVERTISER_IDS || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
+  const databaseUrl = getDatabaseUrl();
+  if (!token && !directFeedUrl && !feedApiKey && !feedListUrl) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add an Awin product-feed URL, feed-list URL/API key, or publisher API token in the production environment." });
+  if (!databaseUrl) return res.status(503).json({ ok: false, message: "Awin sync requires a PostgreSQL database connection." });
+
+  const requestedLocale = String((req.body as any)?.locale || (req.query as any)?.locale || "").trim();
+  const configuredLocales = (requestedLocale || process.env.AWIN_FEED_LOCALES || process.env.AWIN_FEED_LOCALE || "en_GB").split(/[\s,;|]+/).map((value) => value.trim()).filter(Boolean).slice(0, 12);
+  const locales = directFeedUrl ? [configuredLocales[0] || "en_GB"] : configuredLocales;
+  const maxProductsPerAdvertiser = Math.min(Math.max(Number((req.body as any)?.limit || (req.query as any)?.limit || process.env.AWIN_PRODUCTS_PER_ADVERTISER || 100), 1), 500);
+  const pool = new Pool({ connectionString: getConnectionString(databaseUrl), ssl: { rejectUnauthorized: false }, max: 2 });
   try {
-    const url = new URL(feedUrl); if (publisherId && !url.searchParams.has("publisherId")) url.searchParams.set("publisherId", publisherId); if (advertiserId && !url.searchParams.has("advertiserId")) url.searchParams.set("advertiserId", advertiserId);
-    const upstream = await fetch(url, { headers: { Accept: "text/csv, application/xml, application/json", ...(token ? { Authorization: `Bearer ${token}`, "X-Api-Key": token } : {}) } });
-    const raw = await upstream.text(); if (!upstream.ok) return result(res, 502, `Awin product feed returned HTTP ${upstream.status}. ${raw.slice(0, 180)}`);
-    const syncedAt = new Date().toISOString(); let products: Product[] = [];
-    if (/json/i.test(upstream.headers.get("content-type") || "") || raw.trim().startsWith("[")) { const parsed = JSON.parse(raw) as any[]; products = parsed.slice(0, 24).map((item, i) => ({ id: String(item.id || item.productId || `awin-${i}`), title: String(item.title || item.name || "Awin partner product"), description: String(item.description || item.shortDescription || "Product from an Awin advertiser."), price: String(item.price || item.currentPrice || "View offer"), currency: String(item.currency || ""), advertiserName: String(item.advertiserName || item.merchantName || "Awin advertiser"), clickUrl: String(item.aw_deep_link || item.deepLink || item.url || item.productUrl || "#"), imageUrl: String(item.imageUrl || item.image || item.merchantImageUrl || ""), syncedAt })); }
-    else if (/<product|<item/i.test(raw)) { const blocks = [...raw.matchAll(/<(?:product|item)\b[^>]*>([\s\S]*?)<\/(?:product|item)>/gi)].map((m) => m[1]); products = blocks.slice(0, 24).map((block, i) => ({ id: tag(block, "id") || tag(block, "aw_product_id") || `awin-${i}`, title: tag(block, "title") || tag(block, "name") || "Awin partner product", description: tag(block, "description") || "Product from an Awin advertiser.", price: tag(block, "price") || "View offer", currency: tag(block, "currency"), advertiserName: tag(block, "brand") || tag(block, "merchant") || "Awin advertiser", clickUrl: tag(block, "aw_deep_link") || tag(block, "link") || tag(block, "url") || "#", imageUrl: tag(block, "image_link") || tag(block, "image") || "", syncedAt })); }
-    else { const rows = csv(raw); const headers = (rows.shift() || []).map((header) => header.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")); const value = (row: string[], names: string[]) => { const index = names.map((name) => headers.indexOf(name)).find((index) => index >= 0); return index === undefined ? "" : row[index] || ""; }; products = rows.slice(0, 24).map((row, i) => ({ id: value(row, ["id", "product_id", "aw_product_id"]) || `awin-${i}`, title: value(row, ["title", "name", "product_name"]) || "Awin partner product", description: value(row, ["description", "short_description"]) || "Product from an Awin advertiser.", price: value(row, ["price", "sale_price"]) || "View offer", currency: value(row, ["currency", "price_currency"]), advertiserName: value(row, ["brand", "merchant", "advertiser_name"]) || "Awin advertiser", clickUrl: value(row, ["aw_deep_link", "deep_link", "link", "url", "product_url"]) || "#", imageUrl: value(row, ["image_link", "image_url", "image"]) || "", syncedAt })); }
-    const dbUrl = databaseUrl(); if (dbUrl && products.length) { const pool = new Pool({ connectionString: cleanUrl(dbUrl), ssl: { rejectUnauthorized: false }, max: 1 }); try { for (const product of products) await pool.query(`INSERT INTO tracked_links ("productId", "token", "source", "network", "externalLinkId", "campaign", "destinationUrl", "imageUrl", "linkStatus", "firstSeenAt", "lastSeenAt", "lastCheckedAt") VALUES (0, $1, $2, 'awin', $3, $4, $5, $6, 'active', NOW(), NOW(), NOW()) ON CONFLICT ("token") DO UPDATE SET "destinationUrl"=EXCLUDED."destinationUrl", "imageUrl"=EXCLUDED."imageUrl", "linkStatus"='active', "lastSeenAt"=NOW(), "lastCheckedAt"=NOW(), "lastCheckError"=NULL`, [`awin:${product.id}`, product.advertiserName, product.id, advertiserId || "product-feed", product.clickUrl, product.imageUrl]); } finally { await pool.end(); } }
-    return result(res, products.length ? 200 : 502, products.length ? `Loaded ${products.length} Awin products.` : "Awin feed returned no usable products.", products);
-  } catch (e) { return result(res, 502, e instanceof Error ? e.message : "Awin product feed request failed."); }
+    const programmes = token ? await fetchProgrammes(publisherId, token) : [];
+    const activeProgrammes = programmes.filter((p) => String(p.status || "active").toLowerCase() === "active");
+    const selected = configuredAdvertiserIds.length
+      ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
+      : directFeedUrl || feedApiKey || feedListUrl
+        ? [{ id: 0, name: "Awin product feed list", status: "active" } as Programme]
+        : activeProgrammes;
+    let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
+    const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string }> = [];
+
+    for (const locale of locales) {
+      for (const programme of selected) {
+        const advertiserId = Number(programme.id);
+        const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey || feedListUrl, directFeedUrl);
+        const feedProducts = feed.products;
+        const feedStatus = feed.reason;
+        if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: 0, feed: feed.reason }); continue; }
+        if (feedProducts.length) advertisersWithFeeds++;
+        let advertiserImported = 0;
+        for (const product of feedProducts.slice(0, maxProductsPerAdvertiser)) {
+          const externalId = text(product.id || product.gtin || product.mpn);
+          const destination = firstUrl(product.link, product.mobile_link);
+          const title = text(product.title || product.name, `Awin product ${externalId || "item"}`);
+          const imageUrl = firstUrl(product.image_link, product.imageUrl);
+          if (!externalId || !destination || !imageUrl) continue;
+          const productAdvertiserId = Number(text(product.merchant_id)) || advertiserId;
+          if (!productAdvertiserId) continue;
+          const productSlug = slugify(`awin-${productAdvertiserId}-${locale}-${externalId}`);
+          const clickUrl = affiliateUrl(publisherId, productAdvertiserId, destination);
+          const price = parsePrice(product.sale_price || product.price);
+          const currency = parseCurrency(product.sale_price || product.price, text(programme.currencyCode, "USD"));
+          const description = text(product.description, `${title} from ${text(programme.name, "an Awin advertiser")}.` ).slice(0, 5000);
+          const category = categoryFrom(product);
+          const productResult = await pool.query<{ id: number }>(`INSERT INTO products (slug, name, description, category, "productType", price, currency, "imageUrl", "destinationUrl", status, "availabilityStatus", "claimSafetyStatus", "audienceFitScore", "profitabilityScore", "availabilityScore", "safetyScore", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,'affiliate',$5,$6,$7,$8,'active',$9,'needs_review',0,0,0,0,NOW(),NOW()) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, category=EXCLUDED.category, price=EXCLUDED.price, currency=EXCLUDED.currency, "imageUrl"=EXCLUDED."imageUrl", "destinationUrl"=EXCLUDED."destinationUrl", "updatedAt"=NOW() RETURNING id`, [productSlug, title.slice(0, 255), description, category, price, currency, imageUrl, clickUrl, text(product.availability).toLowerCase() === "out_of_stock" ? "out_of_stock" : "in_stock"]);
+          const productId = productResult.rows[0]?.id;
+          if (!productId) continue;
+          await pool.query(`INSERT INTO tracked_links ("productId", token, source, network, "externalLinkId", campaign, "destinationUrl", "imageUrl", "linkStatus", "firstSeenAt", "lastSeenAt", "lastCheckedAt") VALUES ($1,$2,$3,'awin',$4,$5,$6,$7,'active',NOW(),NOW(),NOW()) ON CONFLICT (token) DO UPDATE SET "productId"=EXCLUDED."productId", "destinationUrl"=EXCLUDED."destinationUrl", "imageUrl"=EXCLUDED."imageUrl", "linkStatus"='active', "lastSeenAt"=NOW(), "lastCheckedAt"=NOW(), "lastCheckError"=NULL`, [productId, `awin:${productAdvertiserId}:${locale}:${externalId}`, text(product.merchant_name || programme.name, `Awin ${productAdvertiserId}`).slice(0, 80), externalId.slice(0, 180), `awin-${productAdvertiserId}-${locale}`, clickUrl, imageUrl]);
+          imported++; advertiserImported++;
+        }
+        advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: advertiserImported, feed: feedStatus || "ok" });
+      }
+    }
+    return res.status(200).json({ ok: true, publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
+  } catch (error) {
+    return res.status(502).json({ ok: false, message: error instanceof Error ? error.message : "Awin synchronization failed." });
+  } finally { await pool.end(); }
 }
+
+export { fetchProgrammes, fetchFeed, fetchFeedFromList, fetchDirectCsvFeed, affiliateUrl };
+
+// This endpoint intentionally never returns or logs the Awin token.
+// Product feeds are processed sequentially to respect Awin's feed request limits.
