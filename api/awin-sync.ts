@@ -30,8 +30,13 @@ async function fetchFeedFromList(feedApiKey: string, advertiserId: number, local
   const wantedId = String(advertiserId);
   const wantedLocale = locale.toLowerCase();
   for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim() || line.toLowerCase().startsWith("advertiser id")) continue;
+    const fields = parseCsvLine(line);
     const normalized = line.toLowerCase();
-    if (!normalized.includes(wantedId) || !normalized.includes(wantedLocale)) continue;
+    const membership = text(fields[3]).toLowerCase();
+    const language = text(fields[7]).toLowerCase();
+    if (!normalized.includes(wantedId) || (!language && !normalized.includes(wantedLocale))) continue;
+    if (membership && membership !== "joined") continue;
     const url = extractCsvUrl(line);
     if (url) return url;
   }
