@@ -1,101 +1,109 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Check, ChevronRight, LockKeyhole, Settings2, ShieldCheck, Store, X } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { trpc } from "@/lib/trpc";
 
-const demoProducts: any[] = [];
-const socialProfiles = [
-  { label: "Facebook", url: "https://www.facebook.com/profile.php?id=61593884283083" },
-  { label: "Instagram", url: "https://www.instagram.com/brandjanra/" },
-  { label: "YouTube handle", url: "https://www.youtube.com/@brandjanra" },
-  { label: "YouTube channel", url: "https://www.youtube.com/channel/UCb_Bm4zZrEjTDmG7uU-eV2Q" },
-];
+type CatalogProduct = {
+  id?: string;
+  title: string;
+  advertiserName?: string;
+  currency?: string;
+  price?: string | number;
+  imageUrl?: string;
+  description?: string;
+  clickUrl?: string;
+};
+
+const fallbackImage = "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?w=900&auto=format&fit=crop&q=85";
 
 export default function Home() {
-  const [controlRoomOpen, setControlRoomOpen] = useState(false);
-  const [cjOpen, setCjOpen] = useState(true);
-  const [awinOpen, setAwinOpen] = useState(false);
-  const [rakutenOpen, setRakutenOpen] = useState(false);
-  const [impactOpen, setImpactOpen] = useState(false);
-  const [form, setForm] = useState<{ publisherId: string; websiteId: string; apiToken: string; deepLinkEndpoint: string }>(() => { try { return JSON.parse(localStorage.getItem("brandjanra-cj-settings") || "null") || { publisherId: "", websiteId: "", apiToken: "", deepLinkEndpoint: "https://link-search.api.cj.com/v2/link-search" }; } catch { return { publisherId: "", websiteId: "", apiToken: "", deepLinkEndpoint: "https://link-search.api.cj.com/v2/link-search" }; } });
-  const [cjSyncForm, setCjSyncForm] = useState(() => { try { return JSON.parse(localStorage.getItem("brandjanra-cj-sync") || "null") || { companyId: "8057555", pid: "", keyword: "" }; } catch { return { companyId: "8057555", pid: "", keyword: "" }; } });
-  const [syncMessage, setSyncMessage] = useState("");
-  const [syncedProducts, setSyncedProducts] = useState<any[]>([]);
-  const [awinProducts, setAwinProducts] = useState<any[]>([]);
-  const [linkHistory, setLinkHistory] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem("brandjanra-cj-link-history") || "[]"); } catch { return []; } });
-  const [awinForm, setAwinForm] = useState({ publisherId: "", advertiserId: "", apiToken: "", deeplinkEndpoint: "https://www.awin1.com/cread.php" });
-  const [rakutenForm, setRakutenForm] = useState({ siteId: "", advertiserId: "", apiToken: "", deeplinkEndpoint: "https://click.linksynergy.com/fs-bin/click" });
-  const [impactForm, setImpactForm] = useState({ accountSid: "", actionTrackerId: "", apiKey: "", deeplinkEndpoint: "https://api.impact.com" });
-  const [testing, setTesting] = useState(false);
-  const [testingAwin, setTestingAwin] = useState(false);
-  const [testingRakuten, setTestingRakuten] = useState(false);
-  const [testingImpact, setTestingImpact] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [awinResult, setAwinResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [rakutenResult, setRakutenResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [impactResult, setImpactResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const testCj = trpc.integrations.testCj.useMutation();
-  const saveCj = trpc.integrations.saveCj.useMutation();
-  const testAwin = trpc.integrations.testAwin.useMutation();
-  const saveAwin = trpc.integrations.saveAwin.useMutation();
-  const testRakuten = trpc.integrations.testRakuten.useMutation();
-  const saveRakuten = trpc.integrations.saveRakuten.useMutation();
-  const testImpact = trpc.integrations.testImpact.useMutation();
-  const saveImpact = trpc.integrations.saveImpact.useMutation();
-  const socialConnections = trpc.social.connections.useQuery();
-  useEffect(() => { fetch("/api/awin-sync").then(async (response) => { const data = await response.json(); if (data.ok && Array.isArray(data.products)) setAwinProducts(data.products); }).catch(() => undefined); }, []);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
 
-  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const saveCjSettings = () => { localStorage.setItem("brandjanra-cj-settings", JSON.stringify(form)); localStorage.setItem("brandjanra-cj-sync", JSON.stringify(cjSyncForm)); toast.success("CJ settings saved in this browser"); };
-  const syncProducts = async () => { setSyncMessage(""); try { const result = await callCj({ action: "sync", ...cjSyncForm, apiToken: form.apiToken, endpoint: form.deepLinkEndpoint }); if (result.ok) { const now = new Date().toISOString(); const current = result.products || []; const currentIds = new Set(current.map((item: any) => item.id)); const previous = JSON.parse(localStorage.getItem("brandjanra-cj-link-history") || "[]"); const merged = [...previous.filter((item: any) => !currentIds.has(item.id)).map((item: any) => ({ ...item, status: "expired" })), ...current.map((item: any) => ({ ...item, status: "active", lastSeenAt: now }))]; localStorage.setItem("brandjanra-cj-link-history", JSON.stringify(merged)); setLinkHistory(merged); setSyncedProducts(current); setSyncMessage(`${result.message} Active: ${current.length} · Expired: ${merged.filter((item: any) => item.status === "expired").length}`); toast.success(result.message); } else { setSyncMessage(result.message); toast.error(result.message); } } catch (error) { toast.error(error instanceof Error ? error.message : "CJ sync failed"); } };
-  const callCj = async (body: Record<string, unknown>) => { const response = await fetch("/api/cj-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const raw = await response.text(); let result: any; try { result = raw ? JSON.parse(raw) : { ok: false, message: `CJ endpoint returned HTTP ${response.status} with an empty response.` }; } catch { result = { ok: false, message: `CJ endpoint returned HTTP ${response.status} with a non-JSON response.` }; } if (!response.ok && result.ok !== false) result.ok = false; return result; };
-  const runCjTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await callCj({ action: "test", apiToken: form.apiToken, endpoint: form.deepLinkEndpoint });
-      setTestResult(result);
-      if (result.ok) toast.success("CJ Affiliate configuration verified"); else toast.error(result.message);
-    } catch (error) {
-      setTestResult({ ok: false, message: error instanceof Error ? error.message : "Connection test failed" });
-    } finally { setTesting(false); }
-  };
-  const saveCjConfig = async () => {
-    try {
-      if (!form.apiToken.trim()) throw new Error("Enter your CJ Personal Access Token first");
-      setTestResult({ ok: true, message: "CJ token is ready for this browser session. Click Sync products to fetch the catalog." });
-      toast.success("CJ settings ready");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save CJ settings"); }
-  };
-
-  const runAwinTest = async () => { setTestingAwin(true); setAwinResult(null); try { const result = await testAwin.mutateAsync(awinForm); setAwinResult(result); if (result.ok) toast.success("Awin configuration verified"); else toast.error(result.message); } catch (error) { setAwinResult({ ok: false, message: error instanceof Error ? error.message : "Connection test failed" }); } finally { setTestingAwin(false); } };
-  const saveAwinConfig = async () => { try { const result = await saveAwin.mutateAsync(awinForm); setAwinResult(result); toast.success("Awin settings saved securely"); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save Awin settings"); } };
-  const runRakutenTest = async () => { setTestingRakuten(true); setRakutenResult(null); try { const result = await testRakuten.mutateAsync(rakutenForm); setRakutenResult(result); if (result.ok) toast.success("Rakuten Advertising configuration verified"); else toast.error(result.message); } catch (error) { setRakutenResult({ ok: false, message: error instanceof Error ? error.message : "Connection test failed" }); } finally { setTestingRakuten(false); } };
-  const saveRakutenConfig = async () => { try { const result = await saveRakuten.mutateAsync(rakutenForm); setRakutenResult(result); toast.success("Rakuten Advertising settings saved securely"); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save Rakuten settings"); } };
-  const runImpactTest = async () => { setTestingImpact(true); setImpactResult(null); try { const result = await testImpact.mutateAsync(impactForm); setImpactResult(result); if (result.ok) toast.success("impact.com configuration verified"); else toast.error(result.message); } catch (error) { setImpactResult({ ok: false, message: error instanceof Error ? error.message : "Connection test failed" }); } finally { setTestingImpact(false); } };
-  const saveImpactConfig = async () => { try { const result = await saveImpact.mutateAsync(impactForm); setImpactResult(result); toast.success("impact.com settings saved securely"); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save impact.com settings"); } };
+  useEffect(() => {
+    fetch("/api/awin-sync")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.ok && Array.isArray(data.products)) setProducts(data.products);
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#f6f3ed] text-stone-950">
       <header className="sticky top-0 z-20 border-b border-stone-200/80 bg-[#f6f3ed]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-10">
-          <div className="flex items-center gap-3"><img src="/manus-storage/Logo_294c6d62.png" alt="Janra" className="h-11 w-11 rounded-full object-cover shadow-sm" /><div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-stone-500">Global health & beauty</p><h1 className="font-display text-2xl font-semibold tracking-tight">Brand Janra</h1></div></div>
-          <Button onClick={() => setControlRoomOpen(true)} className="bg-stone-950 text-white hover:bg-stone-800"><Settings2 className="mr-2 h-4 w-4" /> Control room</Button>
+        <div className="mx-auto flex max-w-7xl items-center px-5 py-4 lg:px-10">
+          <div className="flex items-center gap-3">
+            <img src="/manus-storage/Logo_294c6d62.png" alt="Janra" className="h-11 w-11 rounded-full object-cover shadow-sm" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-stone-500">Global health &amp; beauty</p>
+              <h1 className="font-display text-2xl font-semibold tracking-tight">Brand Janra</h1>
+            </div>
+          </div>
         </div>
       </header>
 
       <main>
-        <section className="mx-auto max-w-7xl px-5 pb-12 pt-8 lg:px-10 lg:pt-12"><div className="rounded-[2rem] bg-stone-950 px-7 py-12 text-white shadow-2xl sm:px-12 sm:py-16"><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-200">Janra showroom</p><h2 className="mt-3 max-w-3xl font-display text-5xl leading-[.98] sm:text-7xl">Thoughtful discoveries for everyday rituals.</h2><p className="mt-6 max-w-xl text-sm leading-6 text-stone-300">Explore the latest beauty, wellness, and lifestyle selections.</p></div></section>
-        <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-10"><div className="mb-7 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">Janra selections</p><h3 className="mt-2 font-display text-4xl">Featured discoveries</h3></div><span className="text-sm text-stone-500">Worldwide shipping · USD</span></div><div className="grid gap-5 md:grid-cols-3">{(syncedProducts.length ? syncedProducts.map((product) => ({ name: product.title, brand: product.advertiserName, category: "CJ partner product", price: `${product.currency} ${product.price}`, image: product.imageUrl, tag: "", detail: product.description, clickUrl: product.clickUrl })) : awinProducts.length ? awinProducts.map((product) => ({ name: product.title, brand: product.advertiserName, category: "Awin partner product", price: `${product.currency} ${product.price}`, image: product.imageUrl, tag: "", detail: product.description, clickUrl: product.clickUrl })) : demoProducts).map((product) => <Card key={product.name} className="overflow-hidden border-stone-200 bg-white shadow-sm"><div className="relative h-56 overflow-hidden bg-stone-100"><img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" onError={(event) => { event.currentTarget.src = "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?w=900&auto=format&fit=crop&q=85"; }} /><div className="absolute inset-0 bg-gradient-to-t from-stone-950/45 to-transparent" /><div className="absolute bottom-4 left-5">{product.tag && <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-stone-700">{product.tag}</span>}</div></div><CardContent className="p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-wider text-stone-500">{product.brand}</p><h4 className="mt-1 text-lg font-semibold">{product.name}</h4><p className="mt-2 text-sm text-stone-500">{product.category}</p></div><p className="font-semibold">{product.price}</p></div><p className="mt-3 line-clamp-3 text-sm leading-6 text-stone-600">{product.detail}</p><a href={product.clickUrl || "#"} target="_blank" rel="noreferrer sponsored noopener" className="block mt-5"><Button variant="outline" className="w-full border-stone-300" disabled={!product.clickUrl}>View offer <ChevronRight className="ml-auto h-4 w-4" /></Button></a></CardContent></Card>)}</div></section>
-        <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-10"><div className="rounded-[1.75rem] border border-stone-200 bg-white px-7 py-8 text-center shadow-sm"><p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">Janra selections</p><p className="mt-2 text-sm text-stone-600">New discoveries are added as partner links are synchronized.</p></div></section>
-      </main>
+        <section className="mx-auto max-w-7xl px-5 pb-12 pt-8 lg:px-10 lg:pt-12">
+          <div className="rounded-[2rem] bg-stone-950 px-7 py-12 text-white shadow-2xl sm:px-12 sm:py-16">
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-200">Janra showroom</p>
+            <h2 className="mt-3 max-w-3xl font-display text-5xl leading-[.98] sm:text-7xl">Thoughtful discoveries for everyday rituals.</h2>
+            <p className="mt-6 max-w-xl text-sm leading-6 text-stone-300">Explore the latest beauty, wellness, and lifestyle selections.</p>
+          </div>
+        </section>
 
-      {controlRoomOpen && <div className="fixed inset-0 z-40 bg-stone-950/40 backdrop-blur-sm" onClick={() => setControlRoomOpen(false)}><aside className="ml-auto flex h-full w-full max-w-xl flex-col overflow-y-auto bg-[#fbfaf7] shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between border-b border-stone-200 px-7 py-6"><div><p className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-500">Private workspace</p><h2 className="mt-1 font-display text-3xl">Control room</h2><p className="mt-2 text-sm text-stone-500">Configure partner networks and publishing channels.</p></div><Button variant="ghost" size="icon" onClick={() => setControlRoomOpen(false)} aria-label="Close"><X className="h-5 w-5" /></Button></div><div className="space-y-6 p-7"><div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><div className="flex items-center gap-2 font-semibold"><LockKeyhole className="h-4 w-4" /> Credentials stay server-side</div><p className="mt-1 text-emerald-800/80">CJ Personal Access Tokens are never rendered back into the storefront.</p></div><section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-800">Automated CJ catalog</p><h3 className="mt-1 font-semibold text-stone-950">CJ REST Link Search</h3><p className="mt-1 text-sm text-stone-700">Search joined CJ advertiser links and publish only product cards to the storefront.</p></div><Button variant="outline" onClick={saveCjSettings}>Save CJ settings</Button><Button onClick={syncProducts} disabled={false}>Sync joined advertisers</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div><Label htmlFor="cj-token">CJ Personal Access Token</Label><Input id="cj-token" type="password" className="mt-1.5 bg-white" value={form.apiToken} onChange={(e) => update("apiToken", e.target.value)} placeholder="Paste your CJ PAT" /></div><div><Label htmlFor="cj-endpoint">CJ REST Link Search API</Label><Input id="cj-endpoint" className="mt-1.5 bg-white" value={form.deepLinkEndpoint} onChange={(e) => update("deepLinkEndpoint", e.target.value)} /></div></div><div className="mt-4 grid gap-3 sm:grid-cols-3"><div><Label htmlFor="cj-company">CJ account ID (not used by REST Link Search)</Label><Input id="cj-company" className="mt-1.5 bg-white" value={cjSyncForm.companyId} onChange={(e) => setCjSyncForm({ ...cjSyncForm, companyId: e.target.value })} /></div><div><Label htmlFor="cj-pid">Brand Janra Promotional Property ID (PID)</Label><Input id="cj-pid" className="mt-1.5 bg-white" value={cjSyncForm.pid} onChange={(e) => setCjSyncForm({ ...cjSyncForm, pid: e.target.value })} /></div><div><Label htmlFor="cj-keyword">Keyword</Label><Input id="cj-keyword" className="mt-1.5 bg-white" value={cjSyncForm.keyword} onChange={(e) => setCjSyncForm({ ...cjSyncForm, keyword: e.target.value })} /></div></div>{syncMessage && <p className="mt-3 text-sm font-medium text-amber-950">{syncMessage}</p>}<div className="mt-4 rounded-xl border border-amber-200 bg-white/70 p-3 text-xs text-stone-700"><p className="font-semibold text-stone-950">Automatic link sync</p><p className="mt-1">Daily CJ sync is handled by the protected scheduler after CJ credentials are configured in production.</p></div>{linkHistory.length > 0 && <p className="mt-2 text-xs text-stone-600">Link history: {linkHistory.filter((item) => item.status === "active").length} active · {linkHistory.filter((item) => item.status === "expired").length} expired</p>}</section><section className="rounded-2xl border border-stone-200 bg-white"><button className="flex w-full items-center justify-between p-5 text-left" onClick={() => setAwinOpen((open) => !open)}><div><div className="flex items-center gap-2"><Store className="h-4 w-4 text-violet-700" /><h3 className="font-semibold">Awin</h3><Badge className="bg-violet-100 text-violet-900 hover:bg-violet-100">Step 2 of 4</Badge></div><p className="mt-1 text-sm text-stone-500">Publisher, advertiser, and deeplink configuration</p></div><ChevronRight className={`h-5 w-5 transition-transform ${awinOpen ? "rotate-90" : ""}`} /></button>{awinOpen && <div className="space-y-4 border-t border-stone-100 p-5"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="awin-publisher">CJ account / publisher ID</Label><Input id="awin-publisher" className="mt-1.5" value={awinForm.publisherId} onChange={(e) => setAwinForm({ ...awinForm, publisherId: e.target.value })} placeholder="e.g. 12345" /></div><div><Label htmlFor="awin-advertiser">Advertiser ID</Label><Input id="awin-advertiser" className="mt-1.5" value={awinForm.advertiserId} onChange={(e) => setAwinForm({ ...awinForm, advertiserId: e.target.value })} placeholder="e.g. 67890" /></div></div><div><Label htmlFor="awin-token">CJ Personal Access Token</Label><Input id="awin-token" className="mt-1.5" type="password" value={awinForm.apiToken} onChange={(e) => setAwinForm({ ...awinForm, apiToken: e.target.value })} placeholder="Paste the Awin CJ Personal Access Token" /></div><div><Label htmlFor="awin-endpoint">Deeplink endpoint</Label><Input id="awin-endpoint" className="mt-1.5" value={awinForm.deeplinkEndpoint} onChange={(e) => setAwinForm({ ...awinForm, deeplinkEndpoint: e.target.value })} /></div><div className="flex flex-wrap gap-3 pt-2"><Button onClick={runAwinTest} disabled={testingAwin}>{testingAwin ? "Testing…" : "Test connection"}</Button><Button variant="outline" onClick={saveAwinConfig} disabled={saveAwin.isPending}>Save Awin settings</Button></div>{awinResult && <div className={`flex items-start gap-2 rounded-xl p-3 text-sm ${awinResult.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}><Check className="mt-0.5 h-4 w-4" />{awinResult.message}</div>}</div>}</section><section className="rounded-2xl border border-stone-200 bg-white"><button className="flex w-full items-center justify-between p-5 text-left" onClick={() => setRakutenOpen((open) => !open)}><div><div className="flex items-center gap-2"><Store className="h-4 w-4 text-red-700" /><h3 className="font-semibold">Rakuten Advertising</h3><Badge className="bg-red-100 text-red-900 hover:bg-red-100">Step 3 of 4</Badge></div><p className="mt-1 text-sm text-stone-500">Site, advertiser, and deep-link configuration</p></div><ChevronRight className={`h-5 w-5 transition-transform ${rakutenOpen ? "rotate-90" : ""}`} /></button>{rakutenOpen && <div className="space-y-4 border-t border-stone-100 p-5"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="rakuten-site">Site ID</Label><Input id="rakuten-site" className="mt-1.5" value={rakutenForm.siteId} onChange={(e) => setRakutenForm({ ...rakutenForm, siteId: e.target.value })} placeholder="e.g. 123456" /></div><div><Label htmlFor="rakuten-advertiser">Advertiser ID</Label><Input id="rakuten-advertiser" className="mt-1.5" value={rakutenForm.advertiserId} onChange={(e) => setRakutenForm({ ...rakutenForm, advertiserId: e.target.value })} placeholder="e.g. 789012" /></div></div><div><Label htmlFor="rakuten-token">CJ Personal Access Token</Label><Input id="rakuten-token" className="mt-1.5" type="password" value={rakutenForm.apiToken} onChange={(e) => setRakutenForm({ ...rakutenForm, apiToken: e.target.value })} placeholder="Paste the Rakuten CJ Personal Access Token" /></div><div><Label htmlFor="rakuten-endpoint">Deep-link endpoint</Label><Input id="rakuten-endpoint" className="mt-1.5" value={rakutenForm.deeplinkEndpoint} onChange={(e) => setRakutenForm({ ...rakutenForm, deeplinkEndpoint: e.target.value })} /></div><div className="flex flex-wrap gap-3 pt-2"><Button onClick={runRakutenTest} disabled={testingRakuten}>{testingRakuten ? "Testing…" : "Test connection"}</Button><Button variant="outline" onClick={saveRakutenConfig} disabled={saveRakuten.isPending}>Save Rakuten settings</Button></div>{rakutenResult && <div className={`flex items-start gap-2 rounded-xl p-3 text-sm ${rakutenResult.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}><Check className="mt-0.5 h-4 w-4" />{rakutenResult.message}</div>}</div>}</section><section className="rounded-2xl border border-stone-200 bg-white"><button className="flex w-full items-center justify-between p-5 text-left" onClick={() => setImpactOpen((open) => !open)}><div><div className="flex items-center gap-2"><Store className="h-4 w-4 text-orange-700" /><h3 className="font-semibold">impact.com</h3><Badge className="bg-orange-100 text-orange-900 hover:bg-orange-100">Step 4 of 4</Badge></div><p className="mt-1 text-sm text-stone-500">Account, action tracker, and tracking endpoint</p></div><ChevronRight className={`h-5 w-5 transition-transform ${impactOpen ? "rotate-90" : ""}`} /></button>{impactOpen && <div className="space-y-4 border-t border-stone-100 p-5"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="impact-account">Account SID</Label><Input id="impact-account" className="mt-1.5" value={impactForm.accountSid} onChange={(e) => setImpactForm({ ...impactForm, accountSid: e.target.value })} placeholder="e.g. 12345" /></div><div><Label htmlFor="impact-tracker">Action Tracker ID</Label><Input id="impact-tracker" className="mt-1.5" value={impactForm.actionTrackerId} onChange={(e) => setImpactForm({ ...impactForm, actionTrackerId: e.target.value })} placeholder="e.g. 67890" /></div></div><div><Label htmlFor="impact-key">API key</Label><Input id="impact-key" className="mt-1.5" type="password" value={impactForm.apiKey} onChange={(e) => setImpactForm({ ...impactForm, apiKey: e.target.value })} placeholder="Paste the impact.com API key" /></div><div><Label htmlFor="impact-endpoint">Tracking endpoint</Label><Input id="impact-endpoint" className="mt-1.5" value={impactForm.deeplinkEndpoint} onChange={(e) => setImpactForm({ ...impactForm, deeplinkEndpoint: e.target.value })} /></div><div className="flex flex-wrap gap-3 pt-2"><Button onClick={runImpactTest} disabled={testingImpact}>{testingImpact ? "Testing…" : "Test connection"}</Button><Button variant="outline" onClick={saveImpactConfig} disabled={saveImpact.isPending}>Save impact settings</Button></div>{impactResult && <div className={`flex items-start gap-2 rounded-xl p-3 text-sm ${impactResult.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}><Check className="mt-0.5 h-4 w-4" />{impactResult.message}</div>}</div>}</section><div className="rounded-2xl border border-dashed border-stone-300 p-5"><p className="font-semibold">Next integrations</p><p className="mt-1 text-sm text-stone-500">All affiliate networks are now available. Social publishing is the next setup step.</p></div><section className="rounded-2xl border border-stone-200 bg-stone-950 p-5 text-white"><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Social distribution</p><h3 className="mt-2 text-lg font-semibold">Official account connections</h3><p className="mt-1 text-sm text-stone-300">Connect official business accounts for US, Canada, and UK content scheduling. No passwords are stored in the storefront.</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><a href="/api/social-oauth?provider=meta&action=start" className="rounded-xl bg-white/10 p-4 text-sm transition hover:bg-white/15"><span className="font-semibold">Meta Business Suite</span><br /><span className="text-amber-200">{socialConnections.data?.some((connection) => connection.platform === "meta" && connection.status === "connected") ? "Connected" : "Connect with OAuth"}</span></a><a href="/api/social-oauth?provider=youtube&action=start" className="rounded-xl bg-white/10 p-4 text-sm transition hover:bg-white/15"><span className="font-semibold">YouTube Studio</span><br /><span className="text-amber-200">{socialConnections.data?.some((connection) => connection.platform === "youtube" && connection.status === "connected") ? "Connected" : "Connect with OAuth"}</span></a></div><div className="mt-5 rounded-xl border border-white/10 bg-white/5 p-4"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-300">Brand Janra profile references</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{socialProfiles.map((profile) => <a key={profile.url} href={profile.url} target="_blank" rel="noreferrer noopener" className="truncate rounded-lg bg-white/5 px-3 py-2 text-xs text-amber-100 transition hover:bg-white/10">{profile.label} <ArrowUpRight className="ml-1 inline h-3 w-3" /></a>)}</div></div><p className="mt-4 text-xs leading-5 text-stone-400">Meta can cover Facebook Pages and eligible Instagram Professional accounts. YouTube connects one channel per OAuth account. Scheduling and UGC publishing remain reviewable until platform permissions are verified.</p></section></div></aside></div>}
+        <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-10">
+          <div className="mb-7 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">Janra selections</p>
+              <h3 className="mt-2 font-display text-4xl">Featured discoveries</h3>
+            </div>
+            <span className="text-right text-sm text-stone-500">Worldwide shipping · USD</span>
+          </div>
+
+          {products.length ? (
+            <div className="grid gap-5 md:grid-cols-3">
+              {products.map((product, index) => (
+                <Card key={product.id || `${product.title}-${index}`} className="overflow-hidden border-stone-200 bg-white shadow-sm">
+                  <div className="relative h-56 overflow-hidden bg-stone-100">
+                    <img
+                      src={product.imageUrl || fallbackImage}
+                      alt={product.title}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      onError={(event) => {
+                        event.currentTarget.src = fallbackImage;
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950/45 to-transparent" />
+                  </div>
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wider text-stone-500">{product.advertiserName || "Partner discovery"}</p>
+                        <h4 className="mt-1 text-lg font-semibold">{product.title}</h4>
+                        <p className="mt-2 text-sm text-stone-500">Partner product</p>
+                      </div>
+                      {product.price !== undefined && <p className="whitespace-nowrap font-semibold">{product.currency || "USD"} {product.price}</p>}
+                    </div>
+                    {product.description && <p className="mt-3 line-clamp-3 text-sm leading-6 text-stone-600">{product.description}</p>}
+                    <a href={product.clickUrl || "#"} target="_blank" rel="noreferrer sponsored noopener" className="mt-5 block">
+                      <Button variant="outline" className="w-full border-stone-300" disabled={!product.clickUrl}>
+                        View offer <ChevronRight className="ml-auto h-4 w-4" />
+                      </Button>
+                    </a>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[1.75rem] border border-stone-200 bg-white px-7 py-12 text-center shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">Janra selections</p>
+              <p className="mt-2 text-sm text-stone-600">New discoveries are added as partner links are synchronized.</p>
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
