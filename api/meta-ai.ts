@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const DEFAULT_PAYLOAD = {
-  model: "muse-spark-1.2-contributor",
+  model: "Llama-4-Maverick-17B-128E-Instruct-FP8",
   input: [],
   stream: true,
   temperature: 1,
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    const upstream = await fetch("https://api.dev.meta.ai/v1/responses", {
+    const upstream = await fetch("https://api.llama.com/compat/v1/responses", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
