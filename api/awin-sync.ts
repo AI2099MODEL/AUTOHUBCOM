@@ -167,7 +167,11 @@ async function fetchFeed(publisherId: string, advertiserId: number, token: strin
   }
   if (!response || !response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response?.status || 502}` };
   const raw = await response.text();
-  return { products: parseFeedPayload(raw), skipped: false, reason: "" };
+  const lines = raw.split(/\r?\n/).filter((line) => line.trim());
+  const diagnosticKeys = lines.slice(0, 2).flatMap((line) => {
+    try { const value = JSON.parse(line); return value && typeof value === "object" ? Object.keys(value).slice(0, 20) : []; } catch { return []; }
+  });
+  return { products: parseFeedPayload(raw), skipped: false, reason: "", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: raw.length, lines: lines.length, keys: [...new Set(diagnosticKeys)] } };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -202,7 +206,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
     const storefrontProducts: Array<{ id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string }> = [];
-    const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string }> = [];
+    const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string; diagnostic?: { status: number; contentType: string; bytes: number; lines: number; keys: string[] } }> = [];
 
     for (const locale of locales) {
       for (const programme of selected) {
@@ -210,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey || feedListUrl, directFeedUrl);
         const feedProducts = feed.products;
         const feedStatus = feed.reason;
-        if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: 0, feed: feed.reason }); continue; }
+        if (feed.skipped) { skippedFeeds++;         advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: 0, feed: feed.reason, diagnostic: feed.diagnostic }); continue; }
         if (feedProducts.length) advertisersWithFeeds++;
         let advertiserImported = 0;
         for (const product of feedProducts.slice(0, maxProductsPerAdvertiser)) {
@@ -234,7 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           storefrontProducts.push({ id: `awin:${productAdvertiserId}:${locale}:${externalId}`, title: title.slice(0, 255), description, price: price || "View offer", currency, advertiserName: text(product.merchant_name || programme.name, `Awin ${productAdvertiserId}`), clickUrl, imageUrl });
           imported++; advertiserImported++;
         }
-        advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: advertiserImported, feed: feedStatus || "ok" });
+        advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: advertiserImported, feed: feedStatus || "ok", diagnostic: feed.diagnostic });
       }
     }
     return res.status(200).json({ ok: imported > 0, message: imported > 0 ? `Imported ${imported} Awin products into the Awin catalog.` : "Awin feeds were reached but no usable products were imported.", publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, products: storefrontProducts, advertisers: advertiserResults });
