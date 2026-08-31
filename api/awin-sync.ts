@@ -89,6 +89,19 @@ function normalizeFeedProduct(raw: FeedProduct): FeedProduct {
   };
 }
 
+function parseCsvPayload(raw: string): FeedProduct[] {
+  const rows = raw.split(/\r?\n/).filter(Boolean);
+  if (rows.length < 2) return [];
+  const delimiter = rows[0].includes("\t") ? "\t" : ",";
+  const headers = parseCsvLine(rows[0].replace(/^\uFEFF/, ""), delimiter).map((header) => header.trim().toLowerCase());
+  if (!headers.some((header) => ["aw_product_id", "merchant_product_id", "product_name"].includes(header))) return [];
+  return rows.slice(1).map((row) => {
+    const values = parseCsvLine(row, delimiter); const item: FeedProduct = {};
+    headers.forEach((header, index) => { item[header] = values[index] || ""; });
+    return normalizeFeedProduct({ id: item.aw_product_id || item.merchant_product_id, title: item.product_name, description: item.description, link: item.aw_deep_link || item.merchant_deep_link, image_link: item.merchant_image_url || item.aw_image_url, price: item.display_price || item.search_price || item.store_price, currency: item.currency, merchant_name: item.merchant_name, merchant_id: item.merchant_id, product_type: item.merchant_category || item.category_name });
+  }).filter((item) => Boolean(item.id));
+}
+
 function isFeedRecord(value: unknown): value is FeedProduct {
   if (!value || typeof value !== "object") return false;
   const item = value as FeedProduct;
@@ -175,7 +188,9 @@ async function fetchFeed(publisherId: string, advertiserId: number, token: strin
   const diagnosticKeys = lines.slice(0, 2).flatMap((line) => {
     try { const value = JSON.parse(line); return value && typeof value === "object" ? Object.keys(value).slice(0, 20) : []; } catch { return []; }
   });
-  return { products: parseFeedPayload(raw), skipped: false, reason: "", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: rawBytes.length, lines: lines.length, keys: [...new Set(diagnosticKeys)] } };
+  const parsedProducts = parseFeedPayload(raw);
+  const products = parsedProducts.length ? parsedProducts : parseCsvPayload(raw);
+  return { products, skipped: false, reason: "", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: rawBytes.length, lines: lines.length, keys: [...new Set(diagnosticKeys)], parsedRows: products.length } };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
