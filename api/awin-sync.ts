@@ -59,13 +59,13 @@ async function fetchProgrammes(publisherId: string, token: string): Promise<Prog
 
 let directFeedCache: { url: string; products: FeedProduct[] } | undefined;
 
-function parseCsvLine(line: string) {
+function parseCsvLine(line: string, delimiter = ",") {
   const values: string[] = []; let current = ""; let quoted = false;
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     if (char === '"' && line[i + 1] === '"' && quoted) { current += '"'; i++; continue; }
     if (char === '"') { quoted = !quoted; continue; }
-    if (char === ',' && !quoted) { values.push(current.trim()); current = ""; continue; }
+    if (char === delimiter && !quoted) { values.push(current.trim()); current = ""; continue; }
     current += char;
   }
   values.push(current.trim());
@@ -114,19 +114,20 @@ function parseFeedPayload(raw: string): FeedProduct[] {
 async function fetchDirectCsvFeed(feedUrl: string, advertiserId: number) {
   if (directFeedCache?.url === feedUrl) {
     const products = advertiserId > 0 ? directFeedCache.products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : directFeedCache.products;
-    return { products, skipped: false, reason: "" };
+    return { products, skipped: false, reason: "", diagnostic: { status: 200, contentType: "cached-csv", bytes: 0, lines: 0, keys: [], parsedRows: products.length } };
   }
   const response = await fetch(feedUrl, { headers: { Accept: "application/gzip, text/csv, */*", "User-Agent": "BrandJanraSync/1.0" } });
-  if (!response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response.status}` };
+  if (!response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response.status}`, diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: 0, lines: 0, keys: [], parsedRows: 0 } };
   const bytes = Buffer.from(await response.arrayBuffer());
   const contentEncoding = (response.headers.get("content-encoding") || "").toLowerCase();
   const rawBytes = contentEncoding.includes("gzip") || bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes;
   const rows = rawBytes.toString("utf8").split(/\r?\n/).filter(Boolean);
-  if (!rows.length) return { products: [] as FeedProduct[], skipped: true, reason: "Empty Awin CSV feed" };
-  const headers = parseCsvLine(rows[0]).map((header) => header.toLowerCase());
+  if (!rows.length) return { products: [] as FeedProduct[], skipped: true, reason: "Empty Awin CSV feed", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: rawBytes.length, lines: 0, keys: [], parsedRows: 0 } };
+  const delimiter = rows[0].includes("\t") ? "\t" : ",";
+  const headers = parseCsvLine(rows[0].replace(/^\uFEFF/, ""), delimiter).map((header) => header.trim().toLowerCase());
   const products: FeedProduct[] = [];
   for (const row of rows.slice(1)) {
-    const values = parseCsvLine(row); const item: FeedProduct = {};
+    const values = parseCsvLine(row, delimiter); const item: FeedProduct = {};
     headers.forEach((header, index) => { item[header] = values[index] || ""; });
     const merchantId = text(item.merchant_id);
     if (merchantId && merchantId !== String(advertiserId)) continue;
@@ -145,7 +146,8 @@ async function fetchDirectCsvFeed(feedUrl: string, advertiserId: number) {
     });
   }
   directFeedCache = { url: feedUrl, products };
-  return { products: advertiserId > 0 ? products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : products, skipped: false, reason: "" };
+  const filteredProducts = advertiserId > 0 ? products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : products;
+  return { products: filteredProducts, skipped: false, reason: "", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: rawBytes.length, lines: rows.length, keys: headers.slice(0, 20), parsedRows: filteredProducts.length } };
 }
 
 async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string, feedApiKey = "", directFeedUrl = "") {
@@ -206,7 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
     const storefrontProducts: Array<{ id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string }> = [];
-    const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string; diagnostic?: { status: number; contentType: string; bytes: number; lines: number; keys: string[] } }> = [];
+    const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string; diagnostic?: { status: number; contentType: string; bytes: number; lines: number; keys: string[]; parsedRows?: number } }> = [];
 
     for (const locale of locales) {
       for (const programme of selected) {
