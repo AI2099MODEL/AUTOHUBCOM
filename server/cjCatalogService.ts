@@ -6,6 +6,19 @@ type CjSyncInput = { apiToken: string; companyId: string; pid: string; keyword?:
 export type CjProduct = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string; trackingToken: string; network: string; marketHint: string };
 let syncedProducts: CjProduct[] = [];
 
+function dedupeProducts(items: CjProduct[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const title = item.title.trim().toLowerCase().replace(/\s+/g, " ");
+    const advertiser = item.advertiserName.trim().toLowerCase().replace(/\s+/g, " ");
+    const image = item.imageUrl.trim().toLowerCase();
+    const key = `${item.network}|${advertiser}|${title}|${image || item.clickUrl.trim().toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function getSyncedAffiliateProducts(): Promise<CjProduct[]> {
   const db = await getDb();
   if (!db) return syncedProducts;
@@ -31,7 +44,7 @@ export async function getSyncedAffiliateProducts(): Promise<CjProduct[]> {
     const dedicatedAwinProducts = awinRows.filter((row) => row.externalLinkId && row.clickUrl && row.trackingToken).map((row) => ({
       id: String(row.externalLinkId), trackingToken: String(row.trackingToken), network: "awin", title: String(row.title || ""), description: String(row.description || ""), price: row.price ? String(row.price) : "", currency: String(row.currency || ""), advertiserName: String(row.advertiserName || "Awin"), clickUrl: String(row.clickUrl), imageUrl: String(row.imageUrl || ""), syncedAt: new Date(String(row.syncedAt)).toISOString(), marketHint: `${row.currency || ""} ${row.title || ""} ${row.description || ""} ${row.advertiserName || ""}`.toLowerCase(),
     }));
-    return [...dedicatedAwinProducts, ...genericProducts].slice(0, 500);
+    return dedupeProducts([...dedicatedAwinProducts, ...genericProducts]).slice(0, 500);
     } catch { return syncedProducts; }
 }
 

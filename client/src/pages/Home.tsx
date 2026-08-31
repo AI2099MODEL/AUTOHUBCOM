@@ -59,11 +59,11 @@ export default function Home() {
           </div>
 
           {products.length ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {products.map((product, index) => (
                 <a key={product.id || `${product.title}-${index}`} href={product.clickUrl || "#"} target="_blank" rel="noreferrer sponsored noopener" className="group block">
                   <Card className="h-full overflow-hidden border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                    <div className="relative aspect-square overflow-hidden bg-stone-100">
+                    <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
                       <img
                         src={product.imageUrl || fallbackImage}
                         alt={product.title}
@@ -74,9 +74,9 @@ export default function Home() {
                         }}
                       />
                     </div>
-                    <CardContent className="p-3">
-                      <h4 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{product.title}</h4>
-                      <p className="mt-2 text-sm font-bold text-stone-900">{product.price !== undefined && product.price !== "" ? `${product.currency || "USD"} ${product.price}` : "View offer"}</p>
+                    <CardContent className="p-2">
+                      <h4 className="line-clamp-2 min-h-8 text-xs font-semibold leading-4">{product.title}</h4>
+                      <p className="mt-1 text-xs font-bold text-stone-900">{product.price !== undefined && product.price !== "" ? `${product.currency || "USD"} ${product.price}` : "View offer"}</p>
                     </CardContent>
                   </Card>
                 </a>
