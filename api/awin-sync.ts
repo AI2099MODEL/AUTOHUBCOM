@@ -6,11 +6,6 @@ const getConnectionString = (raw: string) => { try { const url = new URL(raw.rep
 
 type Programme = { id: number; name?: string; status?: string; currencyCode?: string; primaryRegion?: { countryCode?: string } };
 type FeedProduct = Record<string, unknown>;
-const officialSeeds: Record<number, FeedProduct[]> = {
-  66494: [{ id: "mooncool-tk1", title: "TK1 Folding Electric Trike", description: "Experience secure and convenient commuting with the Mooncool TK1 Folding Electric Trike. Designed for enhanced stability, comfort, and easy storage.", link: "https://www.mooncool.com/products/tk1-folding-electric-trike", image_link: "https://www.mooncool.com/cdn/shop/files/TK1_6_f7ce1c91-69c8-4e8e-9f15-1b9a04363530.png?v=1750726941&width=2048", availability: "in_stock" }],
-  89509: [{ id: "piscifun-carbon-x-ii", title: "Piscifun® Carbon X II Lightweight Spinning Reel", description: "The Carbon X II upgraded carbon fiber fishing reel is lighter and smoother, designed for battling big fish.", link: "https://www.piscifun.com/products/piscifun-carbon-x-ii-spinning-reels", image_link: "https://www.piscifun.com/cdn/shop/files/Carbon-X2_33f0ba79-f0c2-4ec8-8057-fef342ffb46e_1200x1200.jpg?v=1775008557", availability: "in_stock" }],
-};
-
 const text = (value: unknown, fallback = "") => typeof value === "string" ? value.trim() : value == null ? fallback : String(value).trim();
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 110) || "awin-product";
 const firstUrl = (...values: unknown[]) => values.map((v) => text(v)).find((v) => /^https?:\/\//i.test(v)) || "";
@@ -29,10 +24,6 @@ async function fetchProgrammes(publisherId: string, token: string): Promise<Prog
   if (!response.ok) throw new Error(`Awin programme discovery failed with HTTP ${response.status}: ${raw.slice(0, 180)}`);
   const parsed = JSON.parse(raw);
   return Array.isArray(parsed) ? parsed.filter((p): p is Programme => Number.isFinite(Number(p?.id))) : [];
-}
-
-async function fetchOfficialProducts(_advertiserId: number, products: FeedProduct[]): Promise<FeedProduct[]> {
-  return products;
 }
 
 async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string) {
@@ -73,10 +64,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const programme of selected) {
       const advertiserId = Number(programme.id);
       const feed = await fetchFeed(publisherId, advertiserId, token, locale);
-      let feedProducts = feed.products;
-      let feedStatus = feed.reason;
-      if (feed.skipped && officialSeeds[advertiserId]) { feedProducts = await fetchOfficialProducts(advertiserId, officialSeeds[advertiserId]); feedStatus = feedProducts.length ? "official-page" : feed.reason; }
-      if (feed.skipped && !feedProducts.length) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: 0, feed: feed.reason }); continue; }
+      const feedProducts = feed.products;
+      const feedStatus = feed.reason;
+      if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: 0, feed: feed.reason }); continue; }
       if (feedProducts.length) advertisersWithFeeds++;
       let advertiserImported = 0;
       for (const product of feedProducts.slice(0, maxProductsPerAdvertiser)) {
