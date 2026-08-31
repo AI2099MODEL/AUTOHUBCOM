@@ -140,10 +140,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const publisherId = process.env.AWIN_PUBLISHER_ID || "3064649";
   const token = process.env.AWIN_PUBLISHER_API_TOKEN || process.env.AWIN_API_TOKEN || process.env.AWIN_API_TOKEN_VALUE || "";
   const feedApiKey = process.env.AWIN_PRODUCT_FEED_API_KEY || process.env.AWIN_FEED_API_KEY || "";
+  const feedListUrl = process.env.AWIN_PRODUCT_FEED_LIST_URL || "";
   const directFeedUrl = process.env.AWIN_PRODUCT_FEED_URL || process.env.AWIN_FEED_URL || "";
   const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || process.env.AWIN_ADVERTISER_IDS || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
   const databaseUrl = getDatabaseUrl();
-  if (!token && !directFeedUrl && !feedApiKey) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add AWIN_PUBLISHER_API_TOKEN or an Awin product-feed URL/API key in the production environment." });
+  if (!token && !directFeedUrl && !feedApiKey && !feedListUrl) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add an Awin product-feed URL, feed-list URL/API key, or publisher API token in the production environment." });
   if (!databaseUrl) return res.status(503).json({ ok: false, message: "Awin sync requires a PostgreSQL database connection." });
 
   const requestedLocale = String((req.body as any)?.locale || (req.query as any)?.locale || "").trim();
@@ -156,8 +157,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const activeProgrammes = programmes.filter((p) => String(p.status || "active").toLowerCase() === "active");
     const selected = configuredAdvertiserIds.length
       ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
-      : directFeedUrl || feedApiKey
-        ? [{ id: 0, name: "Awin direct product feed", status: "active" } as Programme]
+      : directFeedUrl || feedApiKey || feedListUrl
+        ? [{ id: 0, name: "Awin product feed list", status: "active" } as Programme]
         : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
     const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string }> = [];
@@ -165,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const locale of locales) {
       for (const programme of selected) {
         const advertiserId = Number(programme.id);
-        const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey, directFeedUrl);
+        const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey || feedListUrl, directFeedUrl);
         const feedProducts = feed.products;
         const feedStatus = feed.reason;
         if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: 0, feed: feed.reason }); continue; }
