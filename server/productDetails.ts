@@ -69,21 +69,15 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}) {
 }
 
 async function resolveSellerPage(affiliateUrl: string) {
-  let current = affiliateUrl;
-  for (let hop = 0; hop < 3; hop++) {
-    const parsed = new URL(current);
-    if (!affiliateHosts.has(parsed.hostname.replace(/^www\./, ""))) return current;
-    const response = await fetchWithTimeout(current, {
+  try {
+    const response = await fetchWithTimeout(affiliateUrl, {
       headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "BrandJanraCatalog/1.0" },
-      redirect: "manual",
+      redirect: "follow",
     });
-    if (response.status < 300 || response.status >= 400) return current;
-    const location = response.headers.get("location");
-    if (!location) return current;
-    current = absoluteUrl(location, current);
-    if (!current) return affiliateUrl;
-  }
-  return current;
+    const resolved = response.url;
+    if (resolved && /^https?:\/\//i.test(resolved)) return resolved;
+  } catch { /* Some affiliate networks block server-side redirect resolution. */ }
+  return affiliateUrl;
 }
 
 export async function getProductDetails(token: string) {
