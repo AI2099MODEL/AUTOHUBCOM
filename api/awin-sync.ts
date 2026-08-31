@@ -6,6 +6,10 @@ const getConnectionString = (url: string) => url.replace(/^postgresql:\/\//, "po
 
 type Programme = { id: number; name?: string; status?: string; currencyCode?: string; primaryRegion?: { countryCode?: string } };
 type FeedProduct = Record<string, unknown>;
+const officialSeeds: Record<number, string[]> = {
+  66494: ["https://www.mooncool.com/products/tk1-folding-electric-trike"],
+  89509: ["https://www.piscifun.com/products/piscifun-carbon-x-ii-spinning-reels"],
+};
 
 const text = (value: unknown, fallback = "") => typeof value === "string" ? value.trim() : value == null ? fallback : String(value).trim();
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 110) || "awin-product";
@@ -25,6 +29,23 @@ async function fetchProgrammes(publisherId: string, token: string): Promise<Prog
   if (!response.ok) throw new Error(`Awin programme discovery failed with HTTP ${response.status}: ${raw.slice(0, 180)}`);
   const parsed = JSON.parse(raw);
   return Array.isArray(parsed) ? parsed.filter((p): p is Programme => Number.isFinite(Number(p?.id))) : [];
+}
+
+async function fetchOfficialProducts(advertiserId: number, urls: string[]): Promise<FeedProduct[]> {
+  const products: FeedProduct[] = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { headers: { "User-Agent": "BrandJanra affiliate catalog bot/1.0", Accept: "text/html" } });
+      if (!response.ok) continue;
+      const html = await response.text();
+      const meta = (name: string) => html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1] || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, "i"))?.[1] || "";
+      const title = meta("og:title") || html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.trim() || "";
+      const description = meta("og:description") || meta("description");
+      const image = meta("og:image");
+      if (title && image) products.push({ id: `${advertiserId}-${Buffer.from(url).toString("base64url").slice(0, 24)}`, title, description, link: url, image_link: image, availability: "in_stock" });
+    } catch { /* Ignore one merchant page and continue with the remaining seeds. */ }
+  }
+  return products;
 }
 
 async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string) {
@@ -65,10 +86,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const programme of selected) {
       const advertiserId = Number(programme.id);
       const feed = await fetchFeed(publisherId, advertiserId, token, locale);
-      if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: 0, feed: feed.reason }); continue; }
-      if (feed.products.length) advertisersWithFeeds++;
+      let feedProducts = feed.products;
+      let feedStatus = feed.reason;
+      if (feed.skipped && officialSeeds[advertiserId]) { feedProducts = await fetchOfficialProducts(advertiserId, officialSeeds[advertiserId]); feedStatus = feedProducts.length ? "official-page" : feed.reason; }
+      if (feed.skipped && !feedProducts.length) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: 0, feed: feed.reason }); continue; }
+      if (feedProducts.length) advertisersWithFeeds++;
       let advertiserImported = 0;
-      for (const product of feed.products.slice(0, maxProductsPerAdvertiser)) {
+      for (const product of feedProducts.slice(0, maxProductsPerAdvertiser)) {
         const externalId = text(product.id || product.gtin || product.mpn);
         const destination = firstUrl(product.link, product.mobile_link);
         const title = text(product.title || product.name, `Awin product ${externalId || "item"}`);
@@ -86,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await pool.query(`INSERT INTO tracked_links ("productId", token, source, network, "externalLinkId", campaign, "destinationUrl", "imageUrl", "linkStatus", "firstSeenAt", "lastSeenAt", "lastCheckedAt") VALUES ($1,$2,$3,'awin',$4,$5,$6,$7,'active',NOW(),NOW(),NOW()) ON CONFLICT (token) DO UPDATE SET "productId"=EXCLUDED."productId", "destinationUrl"=EXCLUDED."destinationUrl", "imageUrl"=EXCLUDED."imageUrl", "linkStatus"='active', "lastSeenAt"=NOW(), "lastCheckedAt"=NOW(), "lastCheckError"=NULL`, [productId, `awin:${advertiserId}:${externalId}`, text(programme.name, `Awin ${advertiserId}`).slice(0, 80), externalId.slice(0, 180), `awin-${advertiserId}`, clickUrl, imageUrl]);
         imported++; advertiserImported++;
       }
-      advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: advertiserImported, feed: "ok" });
+      advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: advertiserImported, feed: feedStatus || "ok" });
     }
     return res.status(200).json({ ok: true, publisherId, locale, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
   } catch (error) {
