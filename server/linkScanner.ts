@@ -1,5 +1,5 @@
-import { AFFILIATE_CONFIG, HealthBeautyItem, STORE_PARTNERS } from "../shared/commerce";
-import { createContentDraft } from "../shared/content";
+import { AFFILIATE_CONFIG, HealthBeautyItem, STORE_PARTNERS } from "../shared/commerce.js";
+import { createContentDraft } from "../shared/content.js";
 
 export interface ScannedProductResult {
   success: boolean;

@@ -1,4 +1,4 @@
-import { AFFILIATE_CONFIG, HealthBeautyItem, STORE_PARTNERS } from "../shared/commerce";
+import { AFFILIATE_CONFIG, HealthBeautyItem, STORE_PARTNERS } from "../shared/commerce.js";
 
 export interface RecommendedDeal {
   id: string;

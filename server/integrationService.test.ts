@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { saveAwinConfig, saveCjConfig, saveImpactConfig, saveRakutenConfig, testAwinConfig, testCjConfig, testImpactConfig, testRakutenConfig } from "./integrationService";
+import { saveAwinConfig, saveCjConfig, saveImpactConfig, saveRakutenConfig, testAwinConfig, testCjConfig, testImpactConfig, testRakutenConfig } from "./integrationService.js";
 
 describe("CJ Affiliate integration", () => {
   const valid = { publisherId: "123456", websiteId: "brandjanra", apiToken: "token-12345678", deepLinkEndpoint: "https://api.cj.com/v3" };

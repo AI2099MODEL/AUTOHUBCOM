@@ -1,4 +1,4 @@
-import { hasCjConfig } from "./integrationService";
+import { hasCjConfig } from "./integrationService.js";
 
 type CjSyncInput = { apiToken: string; companyId: string; pid: string; keyword?: string; limit?: number };
 export type CjProduct = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string };

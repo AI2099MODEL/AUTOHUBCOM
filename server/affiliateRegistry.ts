@@ -1,4 +1,4 @@
-import { autoScanAndParseLink, ScannedProductResult } from "./linkScanner";
+import { autoScanAndParseLink, ScannedProductResult } from "./linkScanner.js";
 
 export interface AffiliateSourceLink { id: string; url: string; label: string; storeName: string; category: string; status: "active" | "expired" | "checking"; lastScannedAt: string; productsFoundCount: number; addedAt: string; }
 

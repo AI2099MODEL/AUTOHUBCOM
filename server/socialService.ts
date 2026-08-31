@@ -1,5 +1,5 @@
 import axios from "axios";
-import { createContentDraft } from "../shared/content";
+import { createContentDraft } from "../shared/content.js";
 
 export interface SocialConfig {
   facebookPageId: string;

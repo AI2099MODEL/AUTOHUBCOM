@@ -1,6 +1,6 @@
-import { HEALTH_BEAUTY_CATALOG, HealthBeautyItem } from "../shared/commerce";
-import { createContentDraft } from "../shared/content";
-import { publishToFacebook, publishToInstagram, PublishResult } from "./socialService";
+import { HEALTH_BEAUTY_CATALOG, HealthBeautyItem } from "../shared/commerce.js";
+import { createContentDraft } from "../shared/content.js";
+import { publishToFacebook, publishToInstagram, PublishResult } from "./socialService.js";
 
 export interface ScheduledSocialPost {
   id: string;

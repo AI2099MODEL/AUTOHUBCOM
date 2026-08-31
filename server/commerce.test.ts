@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildTrackedPath, canPublishOffer, hasRequiredDisclosure, scoreOffer } from "../shared/commerce";
-import { createContentDraft } from "../shared/content";
+import { buildTrackedPath, canPublishOffer, hasRequiredDisclosure, scoreOffer } from "../shared/commerce.js";
+import { createContentDraft } from "../shared/content.js";
 
 describe("commerce rules", () => {
   it("scores an offer from bounded signals", () => {

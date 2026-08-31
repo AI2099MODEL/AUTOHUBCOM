@@ -1,5 +1,5 @@
-import { HEALTH_BEAUTY_CATALOG } from "../shared/commerce";
-import { executeScheduledPost, getSchedulerQueue } from "./socialScheduler";
+import { HEALTH_BEAUTY_CATALOG } from "../shared/commerce.js";
+import { executeScheduledPost, getSchedulerQueue } from "./socialScheduler.js";
 
 async function main() {
   console.log("🚀 Testing connectivity by publishing 2 products to Facebook Page (1185676227972117) and Instagram (@brandjanra)...");

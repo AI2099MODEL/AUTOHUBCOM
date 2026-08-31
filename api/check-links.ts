@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getTrackedLinkLifecycle, markTrackedLinkCheck } from "../server/db";
+import { getTrackedLinkLifecycle, markTrackedLinkCheck } from "../server/db.js";
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Use POST." });
   const expected = process.env.CRON_SECRET; if (expected && req.headers.authorization !== `Bearer ${expected}`) return res.status(401).json({ ok: false, message: "Unauthorized." });

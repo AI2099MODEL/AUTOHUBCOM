@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { eq, sql } from "drizzle-orm";
-import { attributionEvents, trackedLinks } from "../drizzle/schema";
-import { getDb } from "./db";
+import { attributionEvents, trackedLinks } from "../drizzle/schema.js";
+import { getDb } from "./db.js";
 
 export function registerRedirectRoutes(app: Express) {
   app.get("/go/:token", async (req: Request, res: Response) => {

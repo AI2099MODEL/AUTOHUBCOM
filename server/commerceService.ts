@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { attributionEvents, orders, products } from "../drizzle/schema";
-import { getDb } from "./db";
+import { attributionEvents, orders, products } from "../drizzle/schema.js";
+import { getDb } from "./db.js";
 
 export async function getProductBySlug(slug: string) {
   const db = await getDb(); if (!db) return undefined;

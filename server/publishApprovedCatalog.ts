@@ -1,5 +1,5 @@
-import { HEALTH_BEAUTY_CATALOG } from "../shared/commerce";
-import { publishProductToChannels, getSocialStatus } from "./socialService";
+import { HEALTH_BEAUTY_CATALOG } from "../shared/commerce.js";
+import { publishProductToChannels, getSocialStatus } from "./socialService.js";
 
 export async function runAutoPublish() {
   const status = getSocialStatus();
