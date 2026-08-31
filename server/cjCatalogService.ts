@@ -1,7 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, upsertTrackedLink } from "./db.js";
 import { products, trackedLinks } from "../drizzle/schema.js";
-import { hasCjConfig } from "./integrationService.js";
 
 type CjSyncInput = { apiToken: string; companyId: string; pid: string; keyword?: string; limit?: number };
 export type CjProduct = { id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string; syncedAt: string };
@@ -21,7 +20,7 @@ export async function getSyncedCjProducts(): Promise<CjProduct[]> {
       clickUrl: trackedLinks.destinationUrl,
       imageUrl: trackedLinks.imageUrl,
       syncedAt: trackedLinks.lastSeenAt,
-    }).from(trackedLinks).innerJoin(products, eq(trackedLinks.productId, products.id)).where(eq(trackedLinks.network, "cj")).orderBy(sql`${trackedLinks.lastSeenAt} desc`).limit(50);
+    }).from(trackedLinks).innerJoin(products, eq(trackedLinks.productId, products.id)).where(sql`${trackedLinks.network} = 'cj' AND ${trackedLinks.linkStatus} = 'active' AND ${products.destinationUrl} IS NOT NULL`).orderBy(sql`${trackedLinks.lastSeenAt} desc`).limit(50);
     return rows.filter((row) => row.id && row.clickUrl).map((row) => ({
       id: String(row.id), title: row.title, description: row.description, price: row.price ? String(row.price) : "View offer", currency: row.currency || "", advertiserName: row.advertiserName, clickUrl: row.clickUrl, imageUrl: row.imageUrl || "", syncedAt: row.syncedAt.toISOString(),
     }));
@@ -33,7 +32,6 @@ export async function getSyncedCjProducts(): Promise<CjProduct[]> {
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 140) || "cj-product";
 
 export async function syncCjProducts(input: CjSyncInput) {
-  if (!hasCjConfig()) return { ok: false, message: "Save and verify the CJ Affiliate configuration before syncing products.", products: [] as CjProduct[] } as const;
   if (!input.apiToken.trim() || input.apiToken.trim().length < 8) return { ok: false, message: "A CJ Personal Access Token is required for Product Feed API calls.", products: [] as CjProduct[] } as const;
   if (!input.companyId.trim() || !input.pid.trim()) return { ok: false, message: "CJ Company ID and Promotional Property ID are required.", products: [] as CjProduct[] } as const;
   const query = `{ products(companyId: "${input.companyId.replace(/[^0-9]/g, "")}", keywords: "${(input.keyword || "beauty").replace(/[^a-zA-Z0-9 -]/g, "")}") { resultList { advertiserName id title description price { amount currency } linkCode(pid: "${input.pid.replace(/[^0-9]/g, "")}") { clickUrl } imageUrl } } }`;
