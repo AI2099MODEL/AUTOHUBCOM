@@ -89,18 +89,24 @@ function normalizeFeedProduct(raw: FeedProduct): FeedProduct {
   };
 }
 
+function isFeedRecord(value: unknown): value is FeedProduct {
+  if (!value || typeof value !== "object") return false;
+  const item = value as FeedProduct;
+  return !item.error && Boolean(item.id || item.title || item.product_name || item.link || item.product_basic || item.product_details);
+}
+
 function parseFeedPayload(raw: string): FeedProduct[] {
   try {
     const parsed = JSON.parse(raw);
     const candidates = Array.isArray(parsed)
       ? parsed
       : ["products", "data", "items", "results", "feed"].flatMap((key) => Array.isArray(parsed?.[key]) ? parsed[key] : []);
-    if (candidates.length) return candidates.filter((item): item is FeedProduct => Boolean(item && typeof item === "object" && !item.error && !item.meta)).map(normalizeFeedProduct);
+    if (candidates.length) return candidates.filter(isFeedRecord).map(normalizeFeedProduct);
   } catch { /* Fall through to JSONL parsing. */ }
   return raw.split(/\r?\n/).filter((line) => line.trim()).flatMap((line) => {
     try {
       const item = JSON.parse(line);
-      return item && typeof item === "object" && !item.error && !item.meta ? [normalizeFeedProduct(item as FeedProduct)] : [];
+      return isFeedRecord(item) ? [normalizeFeedProduct(item)] : [];
     } catch { return []; }
   });
 }
