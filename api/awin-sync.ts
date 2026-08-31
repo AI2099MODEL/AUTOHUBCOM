@@ -112,6 +112,7 @@ async function fetchFeed(publisherId: string, advertiserId: number, token: strin
     try { url = await fetchFeedFromList(feedApiKey, advertiserId, locale); }
     catch (error) { return { products: [] as FeedProduct[], skipped: true, reason: error instanceof Error ? error.message : "Product-feed list request failed" }; }
     if (!url) return { products: [] as FeedProduct[], skipped: true, reason: `No accessible product feed for advertiser ${advertiserId} and locale ${locale}` };
+    if (/productdata\.awin\.com|\.csv(?:\.gz)?(?:$|\?)/i.test(url)) return fetchDirectCsvFeed(url, advertiserId);
   } else {
     url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/awinfeeds/download/${advertiserId}-retail-${locale}.jsonl`;
   }
