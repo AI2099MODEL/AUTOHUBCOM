@@ -163,6 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? [{ id: 0, name: "Awin product feed list", status: "active" } as Programme]
         : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
+    const storefrontProducts: Array<{ id: string; title: string; description: string; price: string; currency: string; advertiserName: string; clickUrl: string; imageUrl: string }> = [];
     const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string }> = [];
 
     for (const locale of locales) {
@@ -192,12 +193,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const productId = productResult.rows[0]?.id;
           if (!productId) continue;
           await pool.query(`INSERT INTO tracked_links ("productId", token, source, network, "externalLinkId", campaign, "destinationUrl", "imageUrl", "linkStatus", "firstSeenAt", "lastSeenAt", "lastCheckedAt") VALUES ($1,$2,$3,'awin',$4,$5,$6,$7,'active',NOW(),NOW(),NOW()) ON CONFLICT (token) DO UPDATE SET "productId"=EXCLUDED."productId", "destinationUrl"=EXCLUDED."destinationUrl", "imageUrl"=EXCLUDED."imageUrl", "linkStatus"='active', "lastSeenAt"=NOW(), "lastCheckedAt"=NOW(), "lastCheckError"=NULL`, [productId, `awin:${productAdvertiserId}:${locale}:${externalId}`, text(product.merchant_name || programme.name, `Awin ${productAdvertiserId}`).slice(0, 80), externalId.slice(0, 180), `awin-${productAdvertiserId}-${locale}`, clickUrl, imageUrl]);
+          storefrontProducts.push({ id: `awin:${productAdvertiserId}:${locale}:${externalId}`, title: title.slice(0, 255), description, price: price || "View offer", currency, advertiserName: text(product.merchant_name || programme.name, `Awin ${productAdvertiserId}`), clickUrl, imageUrl });
           imported++; advertiserImported++;
         }
         advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: advertiserImported, feed: feedStatus || "ok" });
       }
     }
-    return res.status(200).json({ ok: true, publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
+    return res.status(200).json({ ok: imported > 0, message: imported > 0 ? `Imported ${imported} Awin products.` : "Awin feeds were reached but no usable products were imported.", publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, products: storefrontProducts, advertisers: advertiserResults });
   } catch (error) {
     return res.status(502).json({ ok: false, message: error instanceof Error ? error.message : "Awin synchronization failed." });
   } finally { await pool.end(); }
