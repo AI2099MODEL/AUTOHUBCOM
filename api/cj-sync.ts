@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const product of products) {
       const productSlug = slugify(`cj-${product.id}`);
       const productResult = await pool.query<{ id: number }>(
-        `INSERT INTO products (slug, name, description, category, "productType", price, currency, "imageUrl", "destinationUrl", status, "availabilityStatus", "claimSafetyStatus", "audienceFitScore", "profitabilityScore", "availabilityScore", "safetyScore", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,'affiliate',NULL,NULL,$5,$6,'active','unknown','needs_review',0,0,0,0,NOW(),NOW()) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, category=EXCLUDED.category, "imageUrl"=EXCLUDED."imageUrl", "destinationUrl"=EXCLUDED."destinationUrl", status='active', "updatedAt"=NOW() RETURNING id`,
+        `INSERT INTO products (slug, name, description, category, "productType", price, currency, "imageUrl", "destinationUrl", status, "availabilityStatus", "claimSafetyStatus", "audienceFitScore", "profitabilityScore", "availabilityScore", "safetyScore", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,'affiliate',NULL,'USD',$5,$6,'active','unknown','needs_review',0,0,0,0,NOW(),NOW()) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, category=EXCLUDED.category, "imageUrl"=EXCLUDED."imageUrl", "destinationUrl"=EXCLUDED."destinationUrl", status='active', "updatedAt"=NOW() RETURNING id`,
         [productSlug, product.title.slice(0, 255), product.description.slice(0, 5000), `CJ · ${product.advertiserName}`.slice(0, 120), product.imageUrl || null, product.clickUrl],
       );
       const productId = productResult.rows[0]?.id;
