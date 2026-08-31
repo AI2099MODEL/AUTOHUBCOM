@@ -29,6 +29,7 @@ async function fetchFeedFromList(feedApiKey: string, advertiserId: number, local
   const raw = await response.text();
   const wantedId = String(advertiserId);
   const wantedLocale = locale.toLowerCase();
+  const candidates: string[] = [];
   for (const line of raw.split(/\r?\n/)) {
     if (!line.trim() || line.toLowerCase().startsWith("advertiser id")) continue;
     const fields = parseCsvLine(line);
@@ -38,9 +39,9 @@ async function fetchFeedFromList(feedApiKey: string, advertiserId: number, local
     if (!normalized.includes(wantedId) || (!language && !normalized.includes(wantedLocale))) continue;
     if (membership && !["joined", "active"].includes(membership)) continue;
     const url = extractCsvUrl(line);
-    if (url) return url;
+    if (url) candidates.push(url);
   }
-  return "";
+  return candidates.find((url) => /productdata\.awin\.com/i.test(url)) || candidates[0] || "";
 }
 
 async function fetchProgrammes(publisherId: string, token: string): Promise<Programme[]> {
