@@ -20,11 +20,12 @@ export default function Home() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
 
   useEffect(() => {
-    fetch("/api/awin-sync")
+    fetch("/api/trpc/catalog.affiliateProducts", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return;
-        const data = await response.json();
-        if (data.ok && Array.isArray(data.products)) setProducts(data.products);
+        const payload = await response.json();
+        const data = payload?.result?.data?.json ?? payload?.result?.data;
+        if (Array.isArray(data)) setProducts(data);
       })
       .catch(() => undefined);
   }, []);
