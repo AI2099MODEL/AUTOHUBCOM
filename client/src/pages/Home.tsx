@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
-import { ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 type CatalogProduct = {
   id?: string;
   title: string;
-  advertiserName?: string;
   currency?: string;
   price?: string | number;
   imageUrl?: string;
-  description?: string;
   clickUrl?: string;
 };
 
@@ -45,7 +41,7 @@ export default function Home() {
       </header>
 
       <main>
-        <section className="mx-auto max-w-7xl px-5 pb-12 pt-8 lg:px-10 lg:pt-12">
+        <section className="mx-auto max-w-7xl px-5 pb-10 pt-8 lg:px-10 lg:pt-12">
           <div className="rounded-[2rem] bg-stone-950 px-7 py-12 text-white shadow-2xl sm:px-12 sm:py-16">
             <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-200">Janra showroom</p>
             <h2 className="mt-3 max-w-3xl font-display text-5xl leading-[.98] sm:text-7xl">Thoughtful discoveries for everyday rituals.</h2>
@@ -54,7 +50,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-10">
-          <div className="mb-7 flex items-end justify-between gap-4">
+          <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">Janra selections</p>
               <h3 className="mt-2 font-display text-4xl">Featured discoveries</h3>
@@ -63,38 +59,27 @@ export default function Home() {
           </div>
 
           {products.length ? (
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {products.map((product, index) => (
-                <Card key={product.id || `${product.title}-${index}`} className="overflow-hidden border-stone-200 bg-white shadow-sm">
-                  <div className="relative h-56 overflow-hidden bg-stone-100">
-                    <img
-                      src={product.imageUrl || fallbackImage}
-                      alt={product.title}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      onError={(event) => {
-                        event.currentTarget.src = fallbackImage;
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950/45 to-transparent" />
-                  </div>
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-stone-500">{product.advertiserName || "Partner discovery"}</p>
-                        <h4 className="mt-1 text-lg font-semibold">{product.title}</h4>
-                        <p className="mt-2 text-sm text-stone-500">Partner product</p>
-                      </div>
-                      {product.price !== undefined && <p className="whitespace-nowrap font-semibold">{product.currency || "USD"} {product.price}</p>}
+                <a key={product.id || `${product.title}-${index}`} href={product.clickUrl || "#"} target="_blank" rel="noreferrer sponsored noopener" className="group block">
+                  <Card className="h-full overflow-hidden border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="relative aspect-square overflow-hidden bg-stone-100">
+                      <img
+                        src={product.imageUrl || fallbackImage}
+                        alt={product.title}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.src = fallbackImage;
+                        }}
+                      />
                     </div>
-                    {product.description && <p className="mt-3 line-clamp-3 text-sm leading-6 text-stone-600">{product.description}</p>}
-                    <a href={product.clickUrl || "#"} target="_blank" rel="noreferrer sponsored noopener" className="mt-5 block">
-                      <Button variant="outline" className="w-full border-stone-300" disabled={!product.clickUrl}>
-                        View offer <ChevronRight className="ml-auto h-4 w-4" />
-                      </Button>
-                    </a>
-                  </CardContent>
-                </Card>
+                    <CardContent className="p-3">
+                      <h4 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{product.title}</h4>
+                      <p className="mt-2 text-sm font-bold text-stone-900">{product.price !== undefined && product.price !== "" ? `${product.currency || "USD"} ${product.price}` : "View offer"}</p>
+                    </CardContent>
+                  </Card>
+                </a>
               ))}
             </div>
           ) : (
