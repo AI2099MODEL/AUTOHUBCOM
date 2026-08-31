@@ -143,7 +143,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = process.env.AWIN_PUBLISHER_API_TOKEN || process.env.AWIN_API_TOKEN || process.env.AWIN_API_TOKEN_VALUE || "";
   const feedApiKey = process.env.AWIN_PRODUCT_FEED_API_KEY || process.env.AWIN_FEED_API_KEY || "";
   const feedListUrl = process.env.AWIN_PRODUCT_FEED_LIST_URL || "";
-  const directFeedUrl = process.env.AWIN_PRODUCT_FEED_URL || process.env.AWIN_FEED_URL || "";
+  const configuredDirectFeedUrl = process.env.AWIN_PRODUCT_FEED_URL || process.env.AWIN_FEED_URL || "";
+  const directFeedUrl = /productdata\.awin\.com\/datafeed\/download\//i.test(configuredDirectFeedUrl) ? configuredDirectFeedUrl : /productdata\.awin\.com\/datafeed\/download\//i.test(feedListUrl) ? feedListUrl : "";
   const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || process.env.AWIN_ADVERTISER_IDS || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
   const databaseUrl = getDatabaseUrl();
   if (!token && !directFeedUrl && !feedApiKey && !feedListUrl) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add an Awin product-feed URL, feed-list URL/API key, or publisher API token in the production environment." });
