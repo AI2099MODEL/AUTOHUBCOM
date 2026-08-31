@@ -130,7 +130,6 @@ async function fetchDirectCsvFeed(feedUrl: string, advertiserId: number) {
     const values = parseCsvLine(row, delimiter); const item: FeedProduct = {};
     headers.forEach((header, index) => { item[header] = values[index] || ""; });
     const merchantId = text(item.merchant_id);
-    if (merchantId && merchantId !== String(advertiserId)) continue;
     products.push({
       id: item.aw_product_id || item.merchant_product_id,
       title: item.product_name,
@@ -168,12 +167,15 @@ async function fetchFeed(publisherId: string, advertiserId: number, token: strin
     await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
   }
   if (!response || !response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response?.status || 502}` };
-  const raw = await response.text();
+  const responseBytes = Buffer.from(await response.arrayBuffer());
+  const contentEncoding = (response.headers.get("content-encoding") || "").toLowerCase();
+  const rawBytes = contentEncoding.includes("gzip") || responseBytes[0] === 0x1f && responseBytes[1] === 0x8b ? gunzipSync(responseBytes) : responseBytes;
+  const raw = rawBytes.toString("utf8");
   const lines = raw.split(/\r?\n/).filter((line) => line.trim());
   const diagnosticKeys = lines.slice(0, 2).flatMap((line) => {
     try { const value = JSON.parse(line); return value && typeof value === "object" ? Object.keys(value).slice(0, 20) : []; } catch { return []; }
   });
-  return { products: parseFeedPayload(raw), skipped: false, reason: "", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: raw.length, lines: lines.length, keys: [...new Set(diagnosticKeys)] } };
+  return { products: parseFeedPayload(raw), skipped: false, reason: "", diagnostic: { status: response.status, contentType: response.headers.get("content-type") || "", bytes: rawBytes.length, lines: lines.length, keys: [...new Set(diagnosticKeys)] } };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
