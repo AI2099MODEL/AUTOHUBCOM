@@ -73,24 +73,28 @@ function parseCsvLine(line: string) {
 }
 
 function normalizeFeedProduct(raw: FeedProduct): FeedProduct {
+  const sections = Object.values(raw).filter((value): value is FeedProduct => Boolean(value && typeof value === "object" && !Array.isArray(value)));
+  const flattened = sections.reduce<FeedProduct>((product, section) => ({ ...product, ...section }), { ...raw });
   return {
-    ...raw,
-    id: raw.id || raw.aw_product_id || raw.merchant_product_id || raw.gtin || raw.mpn,
-    title: raw.title || raw.product_name || raw.name,
-    description: raw.description || raw.product_description,
-    link: raw.link || raw.aw_deep_link || raw.merchant_deep_link || raw.product_url,
-    image_link: raw.image_link || raw.merchant_image_url || raw.aw_image_url || raw.imageUrl,
-    price: raw.price || raw.display_price || raw.search_price || raw.store_price || raw.sale_price,
-    merchant_id: raw.merchant_id || raw.advertiser_id,
-    merchant_name: raw.merchant_name || raw.advertiser_name,
-    product_type: raw.product_type || raw.merchant_category || raw.category_name,
+    ...flattened,
+    id: flattened.id || flattened.aw_product_id || flattened.merchant_product_id || flattened.gtin || flattened.mpn,
+    title: flattened.title || flattened.product_name || flattened.name,
+    description: flattened.description || flattened.product_description,
+    link: flattened.link || flattened.aw_deep_link || flattened.merchant_deep_link || flattened.product_url,
+    image_link: flattened.image_link || flattened.merchant_image_url || flattened.aw_image_url || flattened.imageUrl,
+    price: flattened.price || flattened.display_price || flattened.search_price || flattened.store_price || flattened.sale_price,
+    merchant_id: flattened.merchant_id || flattened.advertiser_id,
+    merchant_name: flattened.merchant_name || flattened.advertiser_name,
+    product_type: flattened.product_type || flattened.merchant_category || flattened.category_name,
   };
 }
 
 function parseFeedPayload(raw: string): FeedProduct[] {
   try {
     const parsed = JSON.parse(raw);
-    const candidates = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.products) ? parsed.products : Array.isArray(parsed?.data) ? parsed.data : [];
+    const candidates = Array.isArray(parsed)
+      ? parsed
+      : ["products", "data", "items", "results", "feed"].flatMap((key) => Array.isArray(parsed?.[key]) ? parsed[key] : []);
     if (candidates.length) return candidates.filter((item): item is FeedProduct => Boolean(item && typeof item === "object" && !item.error && !item.meta)).map(normalizeFeedProduct);
   } catch { /* Fall through to JSONL parsing. */ }
   return raw.split(/\r?\n/).filter((line) => line.trim()).flatMap((line) => {
