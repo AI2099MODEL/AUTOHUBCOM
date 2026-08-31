@@ -72,6 +72,35 @@ function parseCsvLine(line: string) {
   return values;
 }
 
+function normalizeFeedProduct(raw: FeedProduct): FeedProduct {
+  return {
+    ...raw,
+    id: raw.id || raw.aw_product_id || raw.merchant_product_id || raw.gtin || raw.mpn,
+    title: raw.title || raw.product_name || raw.name,
+    description: raw.description || raw.product_description,
+    link: raw.link || raw.aw_deep_link || raw.merchant_deep_link || raw.product_url,
+    image_link: raw.image_link || raw.merchant_image_url || raw.aw_image_url || raw.imageUrl,
+    price: raw.price || raw.display_price || raw.search_price || raw.store_price || raw.sale_price,
+    merchant_id: raw.merchant_id || raw.advertiser_id,
+    merchant_name: raw.merchant_name || raw.advertiser_name,
+    product_type: raw.product_type || raw.merchant_category || raw.category_name,
+  };
+}
+
+function parseFeedPayload(raw: string): FeedProduct[] {
+  try {
+    const parsed = JSON.parse(raw);
+    const candidates = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.products) ? parsed.products : Array.isArray(parsed?.data) ? parsed.data : [];
+    if (candidates.length) return candidates.filter((item): item is FeedProduct => Boolean(item && typeof item === "object" && !item.error && !item.meta)).map(normalizeFeedProduct);
+  } catch { /* Fall through to JSONL parsing. */ }
+  return raw.split(/\r?\n/).filter((line) => line.trim()).flatMap((line) => {
+    try {
+      const item = JSON.parse(line);
+      return item && typeof item === "object" && !item.error && !item.meta ? [normalizeFeedProduct(item as FeedProduct)] : [];
+    } catch { return []; }
+  });
+}
+
 async function fetchDirectCsvFeed(feedUrl: string, advertiserId: number) {
   if (directFeedCache?.url === feedUrl) {
     const products = advertiserId > 0 ? directFeedCache.products.filter((product) => !text(product.merchant_id) || text(product.merchant_id) === String(advertiserId)) : directFeedCache.products;
@@ -128,15 +157,7 @@ async function fetchFeed(publisherId: string, advertiserId: number, token: strin
   }
   if (!response || !response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response?.status || 502}` };
   const raw = await response.text();
-  const products: FeedProduct[] = [];
-  for (const line of raw.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const item = JSON.parse(line);
-      if (item && typeof item === "object" && !item.error && !item.meta) products.push(item);
-    } catch { /* Ignore malformed lines; Awin feeds are JSONL and may include a terminal status line. */ }
-  }
-  return { products, skipped: false, reason: "" };
+  return { products: parseFeedPayload(raw), skipped: false, reason: "" };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -157,7 +178,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestedLocale = String((req.body as any)?.locale || (req.query as any)?.locale || "").trim();
   const configuredLocales = (requestedLocale || process.env.AWIN_FEED_LOCALES || process.env.AWIN_FEED_LOCALE || "en_GB").split(/[\s,;|]+/).map((value) => value.trim()).filter(Boolean).slice(0, 12);
   const locales = directFeedUrl ? [configuredLocales[0] || "en_GB"] : configuredLocales;
-  const maxProductsPerAdvertiser = Math.min(Math.max(Number((req.body as any)?.limit || (req.query as any)?.limit || process.env.AWIN_PRODUCTS_PER_ADVERTISER || 100), 1), 500);
+  const configuredProductLimit = Number((req.body as any)?.limit || (req.query as any)?.limit || process.env.AWIN_PRODUCTS_PER_ADVERTISER || 0);
+  const maxProductsPerAdvertiser = Number.isFinite(configuredProductLimit) && configuredProductLimit > 0 ? configuredProductLimit : Number.POSITIVE_INFINITY;
   const pool = new Pool({ connectionString: getConnectionString(databaseUrl), ssl: { rejectUnauthorized: false }, max: 2 });
   try {
     await ensureAwinTables(pool);
