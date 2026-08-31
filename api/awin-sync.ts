@@ -28,7 +28,7 @@ async function fetchProgrammes(publisherId: string, token: string): Promise<Prog
 
 async function fetchFeed(publisherId: string, advertiserId: number, token: string, locale: string) {
   const url = `https://api.awin.com/publishers/${encodeURIComponent(publisherId)}/awinfeeds/download/${advertiserId}-retail-${locale}.jsonl`;
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/jsonl, application/json" } });
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "*/*" } });
   if (!response.ok) return { products: [] as FeedProduct[], skipped: true, reason: `HTTP ${response.status}` };
   const raw = await response.text();
   const products: FeedProduct[] = [];
@@ -48,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (expected && String(req.headers.authorization || "") !== `Bearer ${expected}`) return res.status(401).json({ ok: false, message: "Unauthorized." });
   const publisherId = process.env.AWIN_PUBLISHER_ID || "3064649";
   const token = process.env.AWIN_PUBLISHER_API_TOKEN || process.env.AWIN_API_TOKEN || process.env.AWIN_API_TOKEN_VALUE || "";
+  const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
   const databaseUrl = getDatabaseUrl();
   if (!token) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add AWIN_PUBLISHER_API_TOKEN in the production environment." });
   if (!databaseUrl) return res.status(503).json({ ok: false, message: "Awin sync requires a PostgreSQL database connection." });
@@ -57,7 +58,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const pool = new Pool({ connectionString: getConnectionString(databaseUrl), ssl: { rejectUnauthorized: false }, max: 2 });
   try {
     const programmes = await fetchProgrammes(publisherId, token);
-    const selected = programmes.filter((p) => String(p.status || "active").toLowerCase() === "active");
+    const activeProgrammes = programmes.filter((p) => String(p.status || "active").toLowerCase() === "active");
+    const selected = configuredAdvertiserIds.length
+      ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
+      : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
     const advertiserResults: Array<{ id: number; name: string; imported: number; feed: string }> = [];
 
@@ -89,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: advertiserImported, feed: feedStatus || "ok" });
     }
-    return res.status(200).json({ ok: true, publisherId, locale, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
+    return res.status(200).json({ ok: true, publisherId, locale, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
   } catch (error) {
     return res.status(502).json({ ok: false, message: error instanceof Error ? error.message : "Awin synchronization failed." });
   } finally { await pool.end(); }
