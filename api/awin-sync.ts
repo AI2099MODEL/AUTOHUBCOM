@@ -205,7 +205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: advertiserImported, feed: feedStatus || "ok" });
       }
     }
-    return res.status(200).json({ ok: imported > 0, message: imported > 0 ? `Imported ${imported} Awin products.` : "Awin feeds were reached but no usable products were imported.", publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, products: storefrontProducts, advertisers: advertiserResults });
+    return res.status(200).json({ ok: imported > 0, message: imported > 0 ? `Imported ${imported} Awin products into the Awin catalog.` : "Awin feeds were reached but no usable products were imported.", publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, products: storefrontProducts, advertisers: advertiserResults });
   } catch (error) {
     return res.status(502).json({ ok: false, message: error instanceof Error ? error.message : "Awin synchronization failed." });
   } finally { await pool.end(); }
