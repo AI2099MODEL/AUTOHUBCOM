@@ -141,55 +141,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = process.env.AWIN_PUBLISHER_API_TOKEN || process.env.AWIN_API_TOKEN || process.env.AWIN_API_TOKEN_VALUE || "";
   const feedApiKey = process.env.AWIN_PRODUCT_FEED_API_KEY || process.env.AWIN_FEED_API_KEY || "";
   const directFeedUrl = process.env.AWIN_PRODUCT_FEED_URL || process.env.AWIN_FEED_URL || "";
-  const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
+  const configuredAdvertiserIds = String(process.env.AWIN_ADVERTISER || process.env.AWIN_ADVERTISER_IDS || "").split(/[\s,;|]+/).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
   const databaseUrl = getDatabaseUrl();
   if (!token) return res.status(503).json({ ok: false, message: "Awin sync is not configured. Add AWIN_PUBLISHER_API_TOKEN in the production environment." });
   if (!databaseUrl) return res.status(503).json({ ok: false, message: "Awin sync requires a PostgreSQL database connection." });
 
   const requestedLocale = String((req.body as any)?.locale || (req.query as any)?.locale || "").trim();
-  const locale = requestedLocale || process.env.AWIN_FEED_LOCALE || "en_GB";
+  const configuredLocales = (requestedLocale || process.env.AWIN_FEED_LOCALES || process.env.AWIN_FEED_LOCALE || "en_GB").split(/[\s,;|]+/).map((value) => value.trim()).filter(Boolean).slice(0, 12);
+  const locales = directFeedUrl ? [configuredLocales[0] || "en_GB"] : configuredLocales;
   const maxProductsPerAdvertiser = Math.min(Math.max(Number((req.body as any)?.limit || (req.query as any)?.limit || process.env.AWIN_PRODUCTS_PER_ADVERTISER || 100), 1), 500);
   const pool = new Pool({ connectionString: getConnectionString(databaseUrl), ssl: { rejectUnauthorized: false }, max: 2 });
   try {
     const programmes = await fetchProgrammes(publisherId, token);
     const activeProgrammes = programmes.filter((p) => String(p.status || "active").toLowerCase() === "active");
-    const selected = directFeedUrl || feedApiKey
-      ? activeProgrammes
-      : configuredAdvertiserIds.length
-        ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
-        : activeProgrammes;
+    const selected = configuredAdvertiserIds.length
+      ? configuredAdvertiserIds.map((id) => activeProgrammes.find((programme) => Number(programme.id) === id) || ({ id, name: `Awin advertiser ${id}`, status: "active" } as Programme))
+      : activeProgrammes;
     let imported = 0; let advertisersWithFeeds = 0; let skippedFeeds = 0;
-    const advertiserResults: Array<{ id: number; name: string; imported: number; feed: string }> = [];
+    const advertiserResults: Array<{ id: number; name: string; locale: string; imported: number; feed: string }> = [];
 
-    for (const programme of selected) {
-      const advertiserId = Number(programme.id);
-      const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey, directFeedUrl);
-      const feedProducts = feed.products;
-      const feedStatus = feed.reason;
-      if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: 0, feed: feed.reason }); continue; }
-      if (feedProducts.length) advertisersWithFeeds++;
-      let advertiserImported = 0;
-      for (const product of feedProducts.slice(0, maxProductsPerAdvertiser)) {
-        const externalId = text(product.id || product.gtin || product.mpn);
-        const destination = firstUrl(product.link, product.mobile_link);
-        const title = text(product.title || product.name, `Awin product ${externalId || "item"}`);
-        const imageUrl = firstUrl(product.image_link, product.imageUrl);
-        if (!externalId || !destination || !imageUrl) continue;
-        const productSlug = slugify(`awin-${advertiserId}-${externalId}`);
-        const clickUrl = affiliateUrl(publisherId, advertiserId, destination);
-        const price = parsePrice(product.sale_price || product.price);
-        const currency = parseCurrency(product.sale_price || product.price, text(programme.currencyCode, "USD"));
-        const description = text(product.description, `${title} from ${text(programme.name, "an Awin advertiser")}.` ).slice(0, 5000);
-        const category = categoryFrom(product);
-        const productResult = await pool.query<{ id: number }>(`INSERT INTO products (slug, name, description, category, "productType", price, currency, "imageUrl", "destinationUrl", status, "availabilityStatus", "claimSafetyStatus", "audienceFitScore", "profitabilityScore", "availabilityScore", "safetyScore", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,'affiliate',$5,$6,$7,$8,'active',$9,'needs_review',0,0,0,0,NOW(),NOW()) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, category=EXCLUDED.category, price=EXCLUDED.price, currency=EXCLUDED.currency, "imageUrl"=EXCLUDED."imageUrl", "destinationUrl"=EXCLUDED."destinationUrl", "updatedAt"=NOW() RETURNING id`, [productSlug, title.slice(0, 255), description, category, price, currency, imageUrl, clickUrl, text(product.availability).toLowerCase() === "out_of_stock" ? "out_of_stock" : "in_stock"]);
-        const productId = productResult.rows[0]?.id;
-        if (!productId) continue;
-        await pool.query(`INSERT INTO tracked_links ("productId", token, source, network, "externalLinkId", campaign, "destinationUrl", "imageUrl", "linkStatus", "firstSeenAt", "lastSeenAt", "lastCheckedAt") VALUES ($1,$2,$3,'awin',$4,$5,$6,$7,'active',NOW(),NOW(),NOW()) ON CONFLICT (token) DO UPDATE SET "productId"=EXCLUDED."productId", "destinationUrl"=EXCLUDED."destinationUrl", "imageUrl"=EXCLUDED."imageUrl", "linkStatus"='active', "lastSeenAt"=NOW(), "lastCheckedAt"=NOW(), "lastCheckError"=NULL`, [productId, `awin:${advertiserId}:${externalId}`, text(programme.name, `Awin ${advertiserId}`).slice(0, 80), externalId.slice(0, 180), `awin-${advertiserId}`, clickUrl, imageUrl]);
-        imported++; advertiserImported++;
+    for (const locale of locales) {
+      for (const programme of selected) {
+        const advertiserId = Number(programme.id);
+        const feed = await fetchFeed(publisherId, advertiserId, token, locale, feedApiKey, directFeedUrl);
+        const feedProducts = feed.products;
+        const feedStatus = feed.reason;
+        if (feed.skipped) { skippedFeeds++; advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: 0, feed: feed.reason }); continue; }
+        if (feedProducts.length) advertisersWithFeeds++;
+        let advertiserImported = 0;
+        for (const product of feedProducts.slice(0, maxProductsPerAdvertiser)) {
+          const externalId = text(product.id || product.gtin || product.mpn);
+          const destination = firstUrl(product.link, product.mobile_link);
+          const title = text(product.title || product.name, `Awin product ${externalId || "item"}`);
+          const imageUrl = firstUrl(product.image_link, product.imageUrl);
+          if (!externalId || !destination || !imageUrl) continue;
+          const productSlug = slugify(`awin-${advertiserId}-${locale}-${externalId}`);
+          const clickUrl = affiliateUrl(publisherId, advertiserId, destination);
+          const price = parsePrice(product.sale_price || product.price);
+          const currency = parseCurrency(product.sale_price || product.price, text(programme.currencyCode, "USD"));
+          const description = text(product.description, `${title} from ${text(programme.name, "an Awin advertiser")}.` ).slice(0, 5000);
+          const category = categoryFrom(product);
+          const productResult = await pool.query<{ id: number }>(`INSERT INTO products (slug, name, description, category, "productType", price, currency, "imageUrl", "destinationUrl", status, "availabilityStatus", "claimSafetyStatus", "audienceFitScore", "profitabilityScore", "availabilityScore", "safetyScore", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,'affiliate',$5,$6,$7,$8,'active',$9,'needs_review',0,0,0,0,NOW(),NOW()) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, category=EXCLUDED.category, price=EXCLUDED.price, currency=EXCLUDED.currency, "imageUrl"=EXCLUDED."imageUrl", "destinationUrl"=EXCLUDED."destinationUrl", "updatedAt"=NOW() RETURNING id`, [productSlug, title.slice(0, 255), description, category, price, currency, imageUrl, clickUrl, text(product.availability).toLowerCase() === "out_of_stock" ? "out_of_stock" : "in_stock"]);
+          const productId = productResult.rows[0]?.id;
+          if (!productId) continue;
+          await pool.query(`INSERT INTO tracked_links ("productId", token, source, network, "externalLinkId", campaign, "destinationUrl", "imageUrl", "linkStatus", "firstSeenAt", "lastSeenAt", "lastCheckedAt") VALUES ($1,$2,$3,'awin',$4,$5,$6,$7,'active',NOW(),NOW(),NOW()) ON CONFLICT (token) DO UPDATE SET "productId"=EXCLUDED."productId", "destinationUrl"=EXCLUDED."destinationUrl", "imageUrl"=EXCLUDED."imageUrl", "linkStatus"='active', "lastSeenAt"=NOW(), "lastCheckedAt"=NOW(), "lastCheckError"=NULL`, [productId, `awin:${advertiserId}:${locale}:${externalId}`, text(programme.name, `Awin ${advertiserId}`).slice(0, 80), externalId.slice(0, 180), `awin-${advertiserId}-${locale}`, clickUrl, imageUrl]);
+          imported++; advertiserImported++;
+        }
+        advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), locale, imported: advertiserImported, feed: feedStatus || "ok" });
       }
-      advertiserResults.push({ id: advertiserId, name: text(programme.name, `Awin advertiser ${advertiserId}`), imported: advertiserImported, feed: feedStatus || "ok" });
     }
-    return res.status(200).json({ ok: true, publisherId, locale, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
+    return res.status(200).json({ ok: true, publisherId, locales, configuredAdvertiserIds, advertisersDiscovered: selected.length, advertisersWithFeeds, skippedFeeds, productsImported: imported, advertisers: advertiserResults });
   } catch (error) {
     return res.status(502).json({ ok: false, message: error instanceof Error ? error.message : "Awin synchronization failed." });
   } finally { await pool.end(); }
