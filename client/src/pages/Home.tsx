@@ -72,7 +72,7 @@ export default function Home() {
             <img
               src="/media/janra-logo-clean.png"
               alt="Janra"
-              className="pointer-events-none absolute left-3 top-1/2 z-10 h-24 w-24 -translate-y-1/2 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,.45)] sm:left-7 sm:h-36 sm:w-36 lg:left-10 lg:h-44 lg:w-44"
+              className="pointer-events-none absolute left-[clamp(4rem,11vw,11rem)] top-1/2 z-10 h-24 w-24 -translate-y-1/2 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,.45)] motion-safe:animate-[janra-rotate_18s_linear_infinite] motion-reduce:animate-none sm:h-36 sm:w-36 lg:h-44 lg:w-44"
             />
           </div>
         </section>
