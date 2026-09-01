@@ -69,11 +69,13 @@ export default function Home() {
             <video className="absolute inset-0 h-full w-full object-contain" autoPlay muted loop playsInline preload="metadata">
               <source src="/media/main-promotion-video.mp4" type="video/mp4" />
             </video>
-            <img
-              src="/media/janra-logo-clean.png"
-              alt="Janra"
-              className="pointer-events-none absolute left-[clamp(4rem,11vw,11rem)] top-1/2 z-10 h-24 w-24 -translate-y-1/2 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,.45)] motion-safe:animate-[janra-rotate_18s_linear_infinite] motion-reduce:animate-none sm:h-36 sm:w-36 lg:h-44 lg:w-44"
-            />
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-[30%] items-center justify-center bg-gradient-to-r from-stone-950/35 via-stone-950/10 to-transparent">
+              <img
+                src="/media/janra-logo-clean.png"
+                alt="Janra"
+                className="h-20 w-20 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,.45)] motion-safe:animate-[janra-rotate_18s_linear_infinite] motion-reduce:animate-none sm:h-28 sm:w-28 lg:h-36 lg:w-36"
+              />
+            </div>
           </div>
         </section>
 
