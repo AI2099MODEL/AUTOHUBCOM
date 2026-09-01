@@ -70,7 +70,7 @@ export default function Home() {
               <source src="/media/main-promotion-video.mp4" type="video/mp4" />
             </video>
             <img
-              src="/media/janra-logo-transparent.png"
+              src="/media/janra-logo-clean.png"
               alt="Janra"
               className="pointer-events-none absolute left-3 top-1/2 z-10 h-24 w-24 -translate-y-1/2 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,.45)] sm:left-7 sm:h-36 sm:w-36 lg:left-10 lg:h-44 lg:w-44"
             />
