@@ -65,17 +65,10 @@ export default function Home() {
 
       <main className="relative z-10">
         <section className="mx-auto max-w-[1600px] px-4 pb-8 pt-5 sm:px-6 lg:px-8 lg:pt-8">
-          <div className="relative isolate min-h-[360px] overflow-hidden rounded-[1.75rem] bg-stone-950 shadow-[0_28px_70px_-24px_rgba(28,25,23,.7)] [transform:perspective(1200px)_rotateX(1deg)] sm:min-h-[430px]">
-            <video className="absolute inset-0 h-full w-full object-cover opacity-55" autoPlay muted loop playsInline preload="metadata">
+          <div className="relative isolate min-h-[220px] overflow-hidden rounded-[1.25rem] bg-stone-950 shadow-[0_28px_70px_-24px_rgba(28,25,23,.7)] [transform:perspective(1200px)_rotateX(1deg)] sm:min-h-[280px]">
+            <video className="absolute inset-0 h-full w-full object-contain" autoPlay muted loop playsInline preload="metadata">
               <source src="/media/main-promotion-video.mp4" type="video/mp4" />
             </video>
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(12,10,9,.9),rgba(12,10,9,.4),rgba(12,10,9,.15))]" />
-            <div className="relative flex min-h-[360px] max-w-2xl flex-col justify-end px-6 py-9 text-white sm:min-h-[430px] sm:px-12 sm:py-12">
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-amber-200">The Janra edit</p>
-              <h2 className="mt-3 max-w-xl font-display text-4xl leading-[.96] sm:text-6xl">Beautiful finds.<br />Better everyday rituals.</h2>
-              <p className="mt-5 max-w-md text-sm leading-6 text-stone-300">Shop a moving collection of useful, beautiful, and well-priced discoveries.</p>
-            </div>
-            <div className="absolute right-5 top-5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80 backdrop-blur">Now showing</div>
           </div>
         </section>
 
